@@ -44,14 +44,13 @@ Latoun Assembly
 custom metal wall plate
 + certified third-party electrical core
 + Latoun actuator
-+ Latoun trim/detail kit
 + visible screws
 + grounding/mounting hardware
 + packaging
 + installation instructions
 ```
 
-Latoun plans to sell complete electrical devices, but the first version should use existing certified third-party internal electrical modules. Latoun owns the visible product language: metal plate, knobs, buttons, trim collars, visible screws, surface treatment, packaging, configurator, BOM, and brand experience.
+Latoun plans to sell complete electrical devices, but the first version should use existing certified third-party internal electrical modules. Latoun owns the visible product language: metal plate, knobs, buttons, visible screws, surface treatment, packaging, configurator, BOM, and brand experience.
 
 Important design principle:
 
@@ -195,7 +194,6 @@ Use these terms consistently across code, UI, documentation, database, and 3D as
 | **Electrical Core** | Certified third-party internal electrical device. |
 | **Latoun Module Kit** | Combination of electrical core plus Latoun visible parts needed to create one module. |
 | **Actuator** | User-touch part: button cap, dimmer knob, outlet face, etc. |
-| **Trim / Detail Kit** | Decorative visible detail pieces: collars, rings, screws, caps. |
 | **Hardware Kit** | Screws, spacers, grounding hardware, mounting pieces. |
 | **Configuration** | Customer-selected product state. |
 | **Resolved BOM** | Generated list of physical parts needed to build a configuration. |
@@ -225,7 +223,6 @@ Latoun
     │   └── Detail Parts
     │       ├── Knobs
     │       ├── Button Caps
-    │       ├── Trim Collars
     │       └── Screws
     ├── Door Hardware
     ├── Cabinet Hardware
@@ -273,7 +270,6 @@ plate
 electrical core
 knob
 button cap
-trim collar
 screw
 hardware kit
 packaging
@@ -354,12 +350,6 @@ Generated BOM:
     "display_name": "Latoun Brushed Brass Button Cap",
     "quantity": 1,
     "source": "slot_2_detail"
-  },
-  {
-    "component_sku": "LAT-TRM-US-MCM-BRS-BRU",
-    "display_name": "Latoun Brushed Brass Trim Collar",
-    "quantity": 2,
-    "source": "detail_kit"
   },
   {
     "component_sku": "LAT-SCR-US-MCM-BRS-BRU",
@@ -850,8 +840,6 @@ plate
 electrical_core
 knob
 button_cap
-trim_collar
-outlet_trim
 screw
 hardware_kit
 packaging
@@ -1064,8 +1052,6 @@ module_type_id
 electrical_core_id
 button_cap_component_id
 knob_component_id
-trim_component_id
-outlet_trim_component_id
 hardware_kit_id
 assembly_approval_status
 notes
@@ -1078,7 +1064,6 @@ Example:
   "module_type": "rotary_push_dimmer",
   "electrical_core_sku": "CORE-DIM-ROT-PUSH-001",
   "knob_component_sku": "LAT-KNB-US-MCM-BRS-BRU",
-  "trim_component_sku": "LAT-TRM-US-MCM-BRS-BRU",
   "hardware_kit_sku": "LAT-HWK-US-DIM-001",
   "assembly_approval_status": "prototype_only"
 }
@@ -1184,7 +1169,6 @@ Source examples:
 plate
 slot_module
 electrical_core
-detail_kit
 screws
 hardware
 packaging
@@ -1290,7 +1274,6 @@ LAT-PL-US-MCM-1G-SS-BRU
 
 LAT-KNB-US-MCM-BRS-BRU
 LAT-BTN-US-MCM-BRS-BRU
-LAT-TRM-US-MCM-BRS-BRU
 LAT-SCR-US-MCM-BRS-BRU
 
 LAT-HWK-US-1G
@@ -1362,7 +1345,6 @@ Houdini can be used to build master assets. USD can be used for internal/master 
         /Details
           /button_caps
           /knobs
-          /trim_collars
           /screws
         /Materials
           /solid_brass_brushed
@@ -1400,8 +1382,7 @@ Do not make the browser load huge USD scenes.
         "position": 1,
         "module_asset": "assets/glb/modules/rotary_push_dimmer.glb",
         "detail_assets": [
-          "assets/glb/details/round_knurled_knob.glb",
-          "assets/glb/details/trim_collar.glb"
+          "assets/glb/details/round_knurled_knob.glb"
         ],
         "material": "solid_brass_brushed"
       },
@@ -1409,8 +1390,7 @@ Do not make the browser load huge USD scenes.
         "position": 2,
         "module_asset": "assets/glb/modules/push_button_switch.glb",
         "detail_assets": [
-          "assets/glb/details/button_cap.glb",
-          "assets/glb/details/trim_collar.glb"
+          "assets/glb/details/button_cap.glb"
         ],
         "material": "solid_brass_brushed"
       }
@@ -1567,7 +1547,7 @@ Example price response:
 ```json
 {
   "configuration_code": "LAT-CFG-000001",
-  "subtotal": 317.0,
+  "subtotal": 275.0,
   "currency": "USD",
   "lines": [
     {
@@ -1587,12 +1567,6 @@ Example price response:
       "quantity": 1,
       "unit_price": 35.0,
       "line_total": 35.0
-    },
-    {
-      "component_sku": "LAT-DETAIL-KIT-US-MCM-BRS-BRU",
-      "quantity": 1,
-      "unit_price": 42.0,
-      "line_total": 42.0
     }
   ]
 }
@@ -1901,11 +1875,9 @@ certified USB-C outlet core
 Detail components:
 brass button cap
 brass dimmer knob
-brass trim collar
 brass visible screw
 stainless button cap
 stainless dimmer knob
-stainless trim collar
 stainless visible screw
 
 Hardware:
@@ -2191,7 +2163,6 @@ System generates BOM:
 1x certified push-button switch core
 1x brushed brass knob
 1x brushed brass button cap
-2x brushed brass trim collars
 4x brushed brass visible screws
 1x 2-gang hardware kit
 1x installation instruction sheet
@@ -2203,7 +2174,6 @@ System calculates price:
 ```text
 plate price
 + electrical core prices
-+ detail kit prices
 + hardware
 + packaging
 = subtotal
