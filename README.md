@@ -1,4 +1,4 @@
-![Data Model](documentation/images/data_model_overview.jpg)
+![Data Model](docs/images/data_model_overview.jpg)
 
 # Latoun Product Model — Configurable Architectural Electrical Hardware
 
