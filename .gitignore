@@ -1,1 +1,18 @@
+# Python
+.venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Generated data (database is reproducible via the seed script)
+data/*.sqlite
+data/*.db
 data/threejs_scene.json
+
+# Environment
+.env

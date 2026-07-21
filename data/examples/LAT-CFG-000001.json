@@ -1,0 +1,31 @@
+{
+  "configuration_code": "LAT-CFG-000001",
+  "gang_count": 1,
+  "module_type": "dimmer",
+  "material": "brass",
+  "assets": [
+    "plate.1gang",
+    "hardware.1gang.plate_screws",
+    "module.1gang.slot01.dimmer"
+  ],
+  "prototype_bom": [
+    {
+      "component_code": "plate.1gang",
+      "display_name": "1-Gang Plate",
+      "quantity": 1,
+      "material": "brass"
+    },
+    {
+      "component_code": "hardware.1gang.plate_screws",
+      "display_name": "1-Gang Plate Screw Set",
+      "quantity": 1,
+      "material": "brass"
+    },
+    {
+      "component_code": "module.1gang.slot01.dimmer",
+      "display_name": "Rotary Dimmer Module",
+      "quantity": 1,
+      "material": "brass"
+    }
+  ]
+}

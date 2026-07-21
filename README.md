@@ -14,6 +14,8 @@ This project defines the **Latoun Product Model**, or **LPM**:
 
 The goal of this repository is to build the documentation, database, local web configurator, front end, back end, and 3D data pipeline needed to support Latoun’s first product family.
 
+> **Run the v0.1 configurator:** from the repo root run `setup_local.bat` once, then `run_local.bat`. See [docs/running.md](docs/running.md) for full instructions. The app opens at http://localhost:5173 and the API docs at http://localhost:8000/docs.
+
 ---
 
 # 1. Product Summary
