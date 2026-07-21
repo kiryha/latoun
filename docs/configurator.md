@@ -29,10 +29,8 @@ The following GLB files already exist:
 1gang_plate.glb
 1gang_plate_screws.glb
 1gang_slot01_dimmer.glb
-1gang_slot01_sitch.glb
+1gang_slot01_switch.glb
 ```
-
-The filename `1gang_slot01_sitch.glb` currently contains a typo. Do not require the file to be renamed. Register it through the asset manifest as the switch asset.
 
 The configurator assembly consists of:
 
@@ -44,7 +42,7 @@ The configurator assembly consists of:
 + selected slot module:
     1gang_slot01_dimmer.glb
     or
-    1gang_slot01_sitch.glb
+    1gang_slot01_switch.glb
 ```
 
 All assets are exported from Houdini in final assembly coordinates.
@@ -192,7 +190,7 @@ latoun/
 │   │           ├── 1gang_plate.glb
 │   │           ├── 1gang_plate_screws.glb
 │   │           ├── 1gang_slot01_dimmer.glb
-│   │           └── 1gang_slot01_sitch.glb
+│   │           └── 1gang_slot01_switch.glb
 │   ├── src/
 │   │   ├── api/
 │   │   ├── components/
@@ -256,7 +254,7 @@ Example:
       "asset_type": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_sitch.glb",
+      "file": "/assets/glb/1gang_slot01_switch.glb",
       "coordinate_space": "assembly_origin",
       "material_policy": "replace_all"
     }
@@ -788,7 +786,7 @@ Example:
 
 ```text
 Could not load switch geometry:
-assets/glb/1gang_slot01_sitch.glb
+assets/glb/1gang_slot01_switch.glb
 ```
 
 ---

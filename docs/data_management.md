@@ -61,10 +61,9 @@ The current geometry assets are:
 1gang_plate.glb
 1gang_plate_screws.glb
 1gang_slot01_dimmer.glb
-1gang_slot01_sitch.glb
+1gang_slot01_switch.glb
 ```
 
-The `1gang_slot01_sitch.glb` filename currently contains a typo. It can remain temporarily because the asset manifest maps the semantic switch asset key to the actual file path.
 
 ---
 
@@ -90,7 +89,7 @@ Example assembly:
 + one selected module:
     1gang_slot01_dimmer.glb
     or
-    1gang_slot01_sitch.glb
+    1gang_slot01_switch.glb
 ```
 
 Three.js should not calculate slot positions or module transformations during the first implementation.
@@ -358,7 +357,7 @@ Example:
       "asset_type": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_sitch.glb",
+      "file": "/assets/glb/1gang_slot01_switch.glb",
       "coordinate_space": "assembly_origin"
     }
   }
@@ -412,7 +411,7 @@ Example:
 ```text
 module.1gang.slot01.switch
     ↓
-/assets/glb/1gang_slot01_sitch.glb
+/assets/glb/1gang_slot01_switch.glb
 ```
 
 This also allows a filename to change without changing configuration logic.
@@ -876,7 +875,7 @@ assets/
 │   └── modules/
 │       └── 1gang/
 │           ├── 1gang_slot01_dimmer.glb
-│           └── 1gang_slot01_sitch.glb
+│           └── 1gang_slot01_switch.glb
 ├── textures/
 │   ├── metals/
 │   └── plastics/
