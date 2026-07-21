@@ -1,5 +1,38 @@
+import { useState } from "react";
 import { Configurator } from "./configurator/Configurator";
+import { MaterialsManager } from "./materials/MaterialsManager";
+
+type Tab = "assembly" | "materials";
 
 export default function App() {
-  return <Configurator />;
+  const [activeTab, setActiveTab] = useState<Tab>("assembly");
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <nav className="app-tabs" role="tablist" aria-label="Sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "assembly"}
+            className={`app-tab${activeTab === "assembly" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("assembly")}
+          >
+            Assembly
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "materials"}
+            className={`app-tab${activeTab === "materials" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("materials")}
+          >
+            Materials
+          </button>
+        </nav>
+      </header>
+
+      {activeTab === "assembly" ? <Configurator /> : <MaterialsManager />}
+    </div>
+  );
 }

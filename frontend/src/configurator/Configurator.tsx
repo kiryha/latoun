@@ -166,12 +166,7 @@ export function Configurator() {
   );
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Latoun Configurator</h1>
-        <span className="version">v0.1 · internal prototype</span>
-      </header>
-
+    <>
       <div className="app-body">
         <main className="viewport">
           {renderState ? (
@@ -278,6 +273,6 @@ export function Configurator() {
       <footer className="app-footer">
         {renderState && <BomPanel bom={renderState.bom} />}
       </footer>
-    </div>
+    </>
   );
 }

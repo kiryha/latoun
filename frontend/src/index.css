@@ -40,23 +40,47 @@ body {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--panel-border);
   background: var(--panel-bg);
 }
 
-.app-header h1 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-  letter-spacing: 0.02em;
+.app-tabs {
+  display: flex;
+  align-items: stretch;
 }
 
-.version {
-  font-size: 12px;
+.app-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
   color: var(--text-muted);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 18px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.app-tab:first-child {
+  padding-left: 0;
+}
+
+.app-tab + .app-tab {
+  border-left: 1px solid var(--panel-border);
+}
+
+.app-tab:hover {
+  color: var(--text);
+}
+
+.app-tab.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .app-body {
@@ -64,6 +88,16 @@ body {
   display: grid;
   grid-template-columns: 1fr 340px;
   min-height: 0;
+}
+
+.materials-manager {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
 .viewport {
