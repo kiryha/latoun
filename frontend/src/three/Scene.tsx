@@ -1,6 +1,9 @@
-// The 3D preview: neutral background, environment lighting, soft key light,
-// contact shadow, and orbit controls (zoom enabled, pan disabled). The camera
-// auto-frames the assembly with <Bounds> so it works regardless of asset scale.
+// The 3D preview: lit purely by an equirectangular HDRI environment (no
+// discrete lights), with explicit ACES Filmic tone mapping, a contact shadow,
+// and orbit controls (zoom enabled, pan disabled). The camera auto-frames the
+// assembly with <Bounds> so it works regardless of asset scale.
+
+const HDRI_PATH = "/assets/hdri/historic_cloister_passage_1k.hdr";
 
 import { Component, Suspense, useLayoutEffect, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
@@ -110,19 +113,14 @@ export function Scene({ renderState, onAssetError }: SceneProps) {
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [0.18, 0.14, 0.32], fov: 35, near: 0.01, far: 100 }}
-      gl={{ antialias: true }}
+      camera={{ position: [0.18, 0.14, 0.32], fov: 50, near: 0.01, far: 100 }}
+      gl={{
+        antialias: true,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.0,
+      }}
     >
       <color attach="background" args={["#2b3036"]} />
-
-      <hemisphereLight args={["#ffffff", "#4a4a52", 0.6]} />
-      <directionalLight
-        castShadow
-        position={[0.4, 0.6, 0.5]}
-        intensity={2.2}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
 
       <Suspense fallback={<LoadingFallback />}>
         {/* Remounting on config change resets the error boundary cleanly. */}
@@ -130,7 +128,8 @@ export function Scene({ renderState, onAssetError }: SceneProps) {
           key={`${renderState.configuration.module_type}:${renderState.material.code}`}
           onError={onAssetError}
         >
-          <Environment preset="studio" />
+          {/* Sole light source: the equirectangular HDRI environment. */}
+          <Environment files={HDRI_PATH} />
           <Bounds fit clip observe margin={1.3}>
             <Assembly renderState={renderState} onMeasured={setMeasurement} />
           </Bounds>
