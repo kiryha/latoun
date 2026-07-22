@@ -14,6 +14,27 @@ export interface Material {
   roughness_texture_path: string | null;
 }
 
+// Full material record used by the material manager (includes status).
+export interface MaterialAdmin extends Material {
+  is_active: boolean;
+}
+
+export interface MaterialCreate {
+  code: string;
+  display_name: string;
+  base_color?: string;
+  metalness?: number;
+  roughness?: number;
+  anisotropy?: number;
+  anisotropy_rotation?: number;
+  normal_texture_path?: string | null;
+  roughness_texture_path?: string | null;
+  is_active?: boolean;
+}
+
+// All fields optional for a partial update; `code` may be renamed.
+export type MaterialUpdate = Partial<MaterialCreate>;
+
 export interface ModuleType {
   code: string;
   display_name: string;

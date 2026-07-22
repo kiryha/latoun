@@ -3,7 +3,7 @@
 // and orbit controls (zoom enabled, pan disabled). The camera auto-frames the
 // assembly with <Bounds> so it works regardless of asset scale.
 
-const HDRI_PATH = "/assets/hdri/historic_cloister_passage_1k.hdr";
+export const HDRI_PATH = "/assets/hdri/historic_cloister_passage_1k.hdr";
 
 import { Component, Suspense, useLayoutEffect, useRef, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";

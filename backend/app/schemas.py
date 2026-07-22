@@ -6,6 +6,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Hex color like #RRGGBB (validated on create/update).
+HEX_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
+# Stable machine identifier: lowercase letters, digits, underscore, hyphen.
+MATERIAL_CODE_PATTERN = r"^[a-z0-9_-]+$"
+
 
 # --------------------------------------------------------------------------- #
 # Catalog
@@ -22,6 +27,48 @@ class MaterialOut(BaseModel):
     anisotropy_rotation: float
     normal_texture_path: str | None = None
     roughness_texture_path: str | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Material management (admin CRUD)
+# --------------------------------------------------------------------------- #
+class MaterialAdminOut(MaterialOut):
+    """Full material record for the material manager, including status."""
+
+    is_active: bool
+
+
+class MaterialCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=64, pattern=MATERIAL_CODE_PATTERN)
+    display_name: str = Field(min_length=1, max_length=128)
+    base_color: str = Field(default="#CCCCCC", pattern=HEX_COLOR_PATTERN)
+    metalness: float = Field(default=1.0, ge=0.0, le=1.0)
+    roughness: float = Field(default=0.5, ge=0.0, le=1.0)
+    anisotropy: float = Field(default=0.0, ge=0.0, le=1.0)
+    anisotropy_rotation: float = Field(default=0.0, ge=0.0, le=6.2831853)
+    normal_texture_path: str | None = Field(default=None, max_length=256)
+    roughness_texture_path: str | None = Field(default=None, max_length=256)
+    is_active: bool = True
+
+
+class MaterialUpdate(BaseModel):
+    """Partial update; only provided fields are changed.
+
+    ``code`` may be renamed; references in saved configurations are cascaded.
+    """
+
+    code: str | None = Field(
+        default=None, min_length=1, max_length=64, pattern=MATERIAL_CODE_PATTERN
+    )
+    display_name: str | None = Field(default=None, min_length=1, max_length=128)
+    base_color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
+    metalness: float | None = Field(default=None, ge=0.0, le=1.0)
+    roughness: float | None = Field(default=None, ge=0.0, le=1.0)
+    anisotropy: float | None = Field(default=None, ge=0.0, le=1.0)
+    anisotropy_rotation: float | None = Field(default=None, ge=0.0, le=6.2831853)
+    normal_texture_path: str | None = Field(default=None, max_length=256)
+    roughness_texture_path: str | None = Field(default=None, max_length=256)
+    is_active: bool | None = None
 
 
 class ModuleTypeOut(BaseModel):

@@ -38,3 +38,10 @@ class NotFoundError(ConfiguratorError):
     """A requested resource (e.g. saved configuration) does not exist."""
 
     status_code = 404
+
+
+class ConflictError(ConfiguratorError):
+    """The request conflicts with current state (e.g. duplicate code, or
+    deleting a material still referenced by a saved configuration)."""
+
+    status_code = 409

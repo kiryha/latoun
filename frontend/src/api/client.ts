@@ -6,6 +6,9 @@ import type {
   ConfigurationDetail,
   ConfigurationRequest,
   ConfigurationSummary,
+  MaterialAdmin,
+  MaterialCreate,
+  MaterialUpdate,
   RenderState,
 } from "../types";
 
@@ -72,4 +75,23 @@ export const api = {
 
   getConfiguration: (id: number) =>
     request<ConfigurationDetail>(`/api/configurations/${id}`),
+
+  listMaterials: () => request<MaterialAdmin[]>("/api/materials"),
+
+  createMaterial: (payload: MaterialCreate) =>
+    request<MaterialAdmin>("/api/materials", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateMaterial: (code: string, payload: MaterialUpdate) =>
+    request<MaterialAdmin>(`/api/materials/${code}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteMaterial: (code: string) =>
+    request<MaterialAdmin>(`/api/materials/${code}`, {
+      method: "DELETE",
+    }),
 };
