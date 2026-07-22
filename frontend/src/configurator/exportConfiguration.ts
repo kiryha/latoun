@@ -10,8 +10,11 @@ export function buildExportPayload(
     configuration_code: configurationCode ?? null,
     gang_count: renderState.configuration.gang_count,
     module_type: renderState.configuration.module_type,
-    material: renderState.configuration.material,
+    finish_scheme: renderState.configuration.finish_scheme,
     assets: renderState.assets.map((asset) => asset.asset_key),
+    // Resolved mapping is included for debugging / reproducibility; the
+    // database stores only the semantic configuration (finish scheme + module).
+    resolved_material_assignments: renderState.material_assignments,
     prototype_bom: renderState.bom,
   };
 }

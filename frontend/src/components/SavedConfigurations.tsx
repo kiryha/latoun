@@ -28,7 +28,7 @@ export function SavedConfigurations({
               <button type="button" onClick={() => onLoad(config.configuration_id)}>
                 <span className="mono">{config.configuration_code}</span>
                 <span className="saved-meta">
-                  {config.module_type_code} · {config.material_code}
+                  {config.module_type_code} · {config.finish_scheme_code}
                 </span>
               </button>
             </li>

@@ -14,7 +14,12 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_session
 from app.main import app
-from app.seed import _upsert_materials, _upsert_module_types
+from app.seed import (
+    _upsert_assignments,
+    _upsert_finish_schemes,
+    _upsert_materials,
+    _upsert_module_types,
+)
 
 
 @pytest.fixture()
@@ -33,6 +38,8 @@ def db_sessionmaker(tmp_path):
     with TestSessionLocal() as session:
         _upsert_materials(session)
         _upsert_module_types(session)
+        _upsert_finish_schemes(session)
+        _upsert_assignments(session)
         session.commit()
 
     yield TestSessionLocal

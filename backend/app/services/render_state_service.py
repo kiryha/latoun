@@ -1,11 +1,17 @@
 """Resolves a semantic configuration into a full render state.
 
 Flow:
-  1. Validate the material code and module type against the database.
+  1. Validate the gang count and module type against the database.
   2. Resolve the ordered list of asset keys for the assembly.
-  3. Look up each asset's GLB path + material policy in the manifest.
-  4. Attach the resolved material parameters.
+  3. Look up each asset's GLB path in the manifest (geometry registry only).
+  4. Resolve semantic material assignments by combining ``init`` with the
+     selected finish scheme (single shared resolver).
   5. Generate the prototype BOM.
+
+The frontend reads semantic binding names from the loaded GLB materials and
+applies the resolved render materials. This service does not inspect GLB
+contents, so missing-binding detection at the geometry level happens on the
+frontend at render time.
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..errors import ValidationError
-from ..models import Material, ModuleType
+from ..models import ModuleType
 from ..schemas import (
     MaterialOut,
     RenderStateOut,
@@ -23,6 +29,7 @@ from ..schemas import (
 )
 from .asset_manifest_service import get_asset_manifest
 from .bom_service import build_prototype_bom
+from .material_assignment_service import resolve_assignment_mapping
 
 SUPPORTED_GANG_COUNTS: tuple[int, ...] = (1,)
 
@@ -37,17 +44,6 @@ _BASE_ASSET_KEYS: tuple[str, ...] = (
     "plate.1gang",
     "hardware.1gang.plate_screws",
 )
-
-
-def _resolve_material(session: Session, material_code: str) -> Material:
-    material = session.scalar(
-        select(Material).where(
-            Material.code == material_code, Material.is_active.is_(True)
-        )
-    )
-    if material is None:
-        raise ValidationError(f"Invalid or inactive material code: {material_code}")
-    return material
 
 
 def _validate_module_type(session: Session, module_type_code: str) -> ModuleType:
@@ -75,12 +71,12 @@ def resolve_render_state(
     *,
     gang_count: int,
     module_type_code: str,
-    material_code: str,
+    finish_scheme_code: str,
 ) -> RenderStateOut:
     """Resolve a semantic configuration into a render state.
 
-    Raises ``ValidationError`` / ``MissingAssetError`` on invalid input so the
-    API layer can surface a clear message.
+    Raises ``ValidationError`` / ``MissingAssetError`` / ``NotFoundError`` on
+    invalid input so the API layer can surface a clear message.
     """
     if gang_count not in SUPPORTED_GANG_COUNTS:
         raise ValidationError(
@@ -88,34 +84,35 @@ def resolve_render_state(
             f"Supported: {list(SUPPORTED_GANG_COUNTS)}"
         )
 
-    material = _resolve_material(session, material_code)
     _validate_module_type(session, module_type_code)
+
+    # Combine init + selected finish scheme into a flat binding -> material map.
+    selected_scheme, active_sources, mapping, materials = resolve_assignment_mapping(
+        session, finish_scheme_code
+    )
 
     manifest = get_asset_manifest()
     asset_keys = _resolve_asset_keys(module_type_code)
+    assets = [
+        ResolvedAsset(asset_key=asset_key, file=manifest.get(asset_key)["file"])
+        for asset_key in asset_keys
+    ]
 
-    assets: list[ResolvedAsset] = []
-    for asset_key in asset_keys:
-        entry = manifest.get(asset_key)  # raises MissingAssetError if absent
-        assets.append(
-            ResolvedAsset(
-                asset_key=asset_key,
-                file=entry["file"],
-                material_policy=entry.get("material_policy", "replace_all"),
-                material_code=material.code,
-            )
-        )
-
-    bom = build_prototype_bom(assets, material.code)
+    bom = build_prototype_bom(assets, selected_scheme.code)
 
     return RenderStateOut(
         is_valid=True,
         configuration=ResolvedConfiguration(
             gang_count=gang_count,
             module_type=module_type_code,
-            material=material.code,
+            finish_scheme=selected_scheme.code,
         ),
-        material=MaterialOut.model_validate(material),
+        active_sources=active_sources,
+        material_assignments=mapping,
+        materials={
+            code: MaterialOut.model_validate(material)
+            for code, material in materials.items()
+        },
         assets=assets,
         bom=bom,
     )

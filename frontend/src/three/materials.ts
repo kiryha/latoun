@@ -18,3 +18,29 @@ export function createPhysicalMaterial(material: Material): THREE.MeshPhysicalMa
 
   return physical;
 }
+
+// Bright magenta error material for a semantic binding that has no assignment.
+// Deliberately obvious so missing assignments are never silent.
+export function createMissingBindingMaterial(
+  bindingName: string,
+): THREE.MeshStandardMaterial {
+  const missingBindingMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff00ff,
+    metalness: 0.0,
+    roughness: 0.5,
+  });
+  missingBindingMaterial.name = `missing_binding:${bindingName}`;
+  return missingBindingMaterial;
+}
+
+// Builds a code -> THREE.Material map from the resolved render materials.
+// One material instance per code, shared across meshes that resolve to it.
+export function buildRenderMaterialMap(
+  materialsByCode: Record<string, Material>,
+): Map<string, THREE.Material> {
+  const map = new Map<string, THREE.Material>();
+  for (const material of Object.values(materialsByCode)) {
+    map.set(material.code, createPhysicalMaterial(material));
+  }
+  return map;
+}

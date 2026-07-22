@@ -1,50 +1,50 @@
-// Loads a single GLB asset and applies the resolved material using the
-// "replace_all" policy: every mesh material is replaced with the shared
-// resolved material. Geometry and transforms are preserved and the asset is
-// added at the origin (Houdini already baked final assembly coordinates).
+// Loads a single GLB asset and applies materials per semantic binding.
+//
+// Each mesh's imported material name is a semantic binding, resolved through the
+// backend-provided assignment map to a shared render material. Missing bindings
+// render magenta and are reported upward. Geometry and transforms are preserved
+// and the asset is added at the origin (Houdini baked final assembly coords).
 
 import { useEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import type { Material, ResolvedAsset } from "../types";
-import { createPhysicalMaterial } from "./materials";
+import type { ResolvedAsset } from "../types";
+import {
+  applySemanticMaterials,
+  collectBindingNames,
+} from "./applySemanticMaterials";
 
 interface AssetModelProps {
   asset: ResolvedAsset;
-  material: Material;
+  materialAssignments: Record<string, string>;
+  renderMaterials: Map<string, THREE.Material>;
+  onResult: (
+    assetKey: string,
+    missingBindings: string[],
+    discoveredBindings: string[],
+  ) => void;
 }
 
-export function AssetModel({ asset, material }: AssetModelProps) {
+export function AssetModel({
+  asset,
+  materialAssignments,
+  renderMaterials,
+  onResult,
+}: AssetModelProps) {
   // drei caches by URL. We clone so multiple configurations / hot swaps do not
   // mutate the shared cached scene.
   const { scene } = useGLTF(asset.file);
-
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
 
-  // Create the resolved material once per material change and dispose it when
-  // it is replaced or the component unmounts, to avoid GPU memory leaks.
-  const resolvedMaterial = useMemo(
-    () => createPhysicalMaterial(material),
-    [material],
-  );
-
   useEffect(() => {
-    return () => {
-      resolvedMaterial.dispose();
-    };
-  }, [resolvedMaterial]);
-
-  useEffect(() => {
-    if (asset.material_policy !== "replace_all") return;
-    clonedScene.traverse((object) => {
-      const mesh = object as THREE.Mesh;
-      if (mesh.isMesh) {
-        mesh.material = resolvedMaterial;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
-    });
-  }, [clonedScene, resolvedMaterial, asset.material_policy]);
+    const discoveredBindings = collectBindingNames(clonedScene);
+    const { missingBindings } = applySemanticMaterials(
+      clonedScene,
+      materialAssignments,
+      renderMaterials,
+    );
+    onResult(asset.asset_key, missingBindings, discoveredBindings);
+  }, [clonedScene, materialAssignments, renderMaterials, asset.asset_key, onResult]);
 
   // Enforce origin placement per the brief; do not add per-asset transforms.
   clonedScene.position.set(0, 0, 0);

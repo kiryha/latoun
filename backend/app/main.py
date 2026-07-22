@@ -11,7 +11,13 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .database import init_database
 from .errors import ConfiguratorError
-from .routes import catalog_routes, configuration_routes, material_routes
+from .routes import (
+    catalog_routes,
+    configuration_routes,
+    finish_scheme_routes,
+    material_assignment_routes,
+    material_routes,
+)
 
 
 @asynccontextmanager
@@ -46,6 +52,8 @@ async def configurator_error_handler(
 app.include_router(catalog_routes.router)
 app.include_router(configuration_routes.router)
 app.include_router(material_routes.router)
+app.include_router(finish_scheme_routes.router)
+app.include_router(material_assignment_routes.router)
 
 
 @app.get("/")

@@ -23,7 +23,7 @@ def _display_name_for(asset_key: str) -> str:
 
 
 def build_prototype_bom(
-    assets: list[ResolvedAsset], material_code: str
+    assets: list[ResolvedAsset], finish_scheme_code: str
 ) -> list[BomLine]:
     """Build one BOM line per resolved renderable asset."""
     return [
@@ -31,7 +31,7 @@ def build_prototype_bom(
             component_code=asset.asset_key,
             display_name=_display_name_for(asset.asset_key),
             quantity=1,
-            material=material_code,
+            finish_scheme=finish_scheme_code,
         )
         for asset in assets
     ]

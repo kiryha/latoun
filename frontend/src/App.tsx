@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { AssignmentsManager } from "./assignments/AssignmentsManager";
 import { Configurator } from "./configurator/Configurator";
 import { MaterialsManager } from "./materials/MaterialsManager";
 
-type Tab = "assembly" | "materials";
+type Tab = "assembly" | "materials" | "assignments";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("assembly");
@@ -29,10 +30,25 @@ export default function App() {
           >
             Materials
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "assignments"}
+            className={`app-tab${activeTab === "assignments" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("assignments")}
+          >
+            Assignments
+          </button>
         </nav>
       </header>
 
-      {activeTab === "assembly" ? <Configurator /> : <MaterialsManager />}
+      {activeTab === "assembly" ? (
+        <Configurator />
+      ) : activeTab === "materials" ? (
+        <MaterialsManager />
+      ) : (
+        <AssignmentsManager />
+      )}
     </div>
   );
 }

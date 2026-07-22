@@ -32,9 +32,6 @@ class AssetManifest:
     def file_for(self, asset_key: str) -> str:
         return self.get(asset_key)["file"]
 
-    def material_policy_for(self, asset_key: str) -> str:
-        return self.get(asset_key).get("material_policy", "replace_all")
-
 
 def _load_manifest_from_disk(path: Path) -> AssetManifest:
     if not path.exists():

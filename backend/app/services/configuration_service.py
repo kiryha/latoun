@@ -24,19 +24,19 @@ def save_configuration(
 
     Resolution runs first so that we never store an invalid configuration.
     """
-    # Resolve to validate material / module type / assets before saving.
+    # Resolve to validate finish scheme / module type / assets before saving.
     resolve_render_state(
         session,
         gang_count=request.gang_count,
         module_type_code=request.module_type,
-        material_code=request.material,
+        finish_scheme_code=request.finish_scheme,
     )
 
     configuration = Configuration(
         configuration_code=_next_configuration_code(session),
         gang_count=request.gang_count,
         module_type_code=request.module_type,
-        material_code=request.material,
+        finish_scheme_code=request.finish_scheme,
     )
     session.add(configuration)
     session.commit()

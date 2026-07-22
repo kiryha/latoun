@@ -2,10 +2,22 @@
 // discrete lights), with explicit ACES Filmic tone mapping, a contact shadow,
 // and orbit controls (zoom enabled, pan disabled). The camera auto-frames the
 // assembly with <Bounds> so it works regardless of asset scale.
+//
+// Materials are applied per semantic binding using the resolved assignment map
+// and render-material definitions from the backend.
 
 export const HDRI_PATH = "/assets/hdri/historic_cloister_passage_1k.hdr";
 
-import { Component, Suspense, useLayoutEffect, useRef, useState } from "react";
+import {
+  Component,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
@@ -18,10 +30,15 @@ import {
 import * as THREE from "three";
 import type { RenderState } from "../types";
 import { AssetModel } from "./AssetModel";
+import { buildRenderMaterialMap } from "./materials";
 
 interface SceneProps {
   renderState: RenderState;
   onAssetError: (message: string) => void;
+  // Reports the union of unresolved semantic bindings across all loaded assets.
+  onMissingBindings?: (missingBindings: string[]) => void;
+  // Reports the union of all imported binding names across all loaded assets.
+  onDiscoveredBindings?: (discoveredBindings: string[]) => void;
 }
 
 interface AssemblyMeasurement {
@@ -31,16 +48,24 @@ interface AssemblyMeasurement {
 
 function Assembly({
   renderState,
+  renderMaterials,
+  onResult,
   onMeasured,
 }: {
   renderState: RenderState;
+  renderMaterials: Map<string, THREE.Material>;
+  onResult: (
+    assetKey: string,
+    missingBindings: string[],
+    discoveredBindings: string[],
+  ) => void;
   onMeasured: (measurement: AssemblyMeasurement) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Re-key the effect on the resolved asset/material set so we re-measure when
-  // the device or material changes.
-  const signature = `${renderState.configuration.module_type}:${renderState.material.code}`;
+  // Re-key the effect on the resolved asset/finish set so we re-measure when
+  // the device or finish changes.
+  const signature = `${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`;
 
   useLayoutEffect(() => {
     if (!groupRef.current) return;
@@ -58,7 +83,9 @@ function Assembly({
         <AssetModel
           key={asset.asset_key}
           asset={asset}
-          material={renderState.material}
+          materialAssignments={renderState.material_assignments}
+          renderMaterials={renderMaterials}
+          onResult={onResult}
         />
       ))}
     </group>
@@ -103,11 +130,57 @@ function LoadingFallback() {
   );
 }
 
-export function Scene({ renderState, onAssetError }: SceneProps) {
+export function Scene({
+  renderState,
+  onAssetError,
+  onMissingBindings,
+  onDiscoveredBindings,
+}: SceneProps) {
   const [measurement, setMeasurement] = useState<AssemblyMeasurement>({
     groundY: -0.08,
     radius: 0.25,
   });
+
+  // One THREE.Material instance per render-material code, shared across meshes.
+  // Rebuilt and disposed when the resolved materials change.
+  const renderMaterials = useMemo(
+    () => buildRenderMaterialMap(renderState.materials),
+    [renderState.materials],
+  );
+
+  useEffect(() => {
+    return () => {
+      renderMaterials.forEach((material) => material.dispose());
+    };
+  }, [renderMaterials]);
+
+  // Aggregate per-asset binding results into unions over the current asset set.
+  const missingByAsset = useRef<Record<string, string[]>>({});
+  const discoveredByAsset = useRef<Record<string, string[]>>({});
+
+  const handleResult = useCallback(
+    (assetKey: string, missing: string[], discovered: string[]) => {
+      missingByAsset.current[assetKey] = missing;
+      discoveredByAsset.current[assetKey] = discovered;
+
+      const assetKeys = renderState.assets.map((asset) => asset.asset_key);
+      if (onMissingBindings) {
+        const union = Array.from(
+          new Set(assetKeys.flatMap((key) => missingByAsset.current[key] ?? [])),
+        ).sort();
+        onMissingBindings(union);
+      }
+      if (onDiscoveredBindings) {
+        const union = Array.from(
+          new Set(
+            assetKeys.flatMap((key) => discoveredByAsset.current[key] ?? []),
+          ),
+        ).sort();
+        onDiscoveredBindings(union);
+      }
+    },
+    [renderState.assets, onMissingBindings, onDiscoveredBindings],
+  );
 
   return (
     <Canvas
@@ -125,13 +198,18 @@ export function Scene({ renderState, onAssetError }: SceneProps) {
       <Suspense fallback={<LoadingFallback />}>
         {/* Remounting on config change resets the error boundary cleanly. */}
         <R3FErrorBoundary
-          key={`${renderState.configuration.module_type}:${renderState.material.code}`}
+          key={`${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`}
           onError={onAssetError}
         >
           {/* Sole light source: the equirectangular HDRI environment. */}
           <Environment files={HDRI_PATH} />
           <Bounds fit clip observe margin={1.3}>
-            <Assembly renderState={renderState} onMeasured={setMeasurement} />
+            <Assembly
+              renderState={renderState}
+              renderMaterials={renderMaterials}
+              onResult={handleResult}
+              onMeasured={setMeasurement}
+            />
           </Bounds>
         </R3FErrorBoundary>
       </Suspense>

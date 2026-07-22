@@ -1,18 +1,18 @@
-"""CRUD for materials used by the material manager.
+"""CRUD for render materials used by the material manager.
 
 Materials are the source of truth for Three.js ``MeshPhysicalMaterial`` render
-parameters. Saved configurations reference a material by its stable ``code``,
-so deleting a material that is still referenced is refused to avoid dangling
-configurations.
+parameters. Material assignments reference a material by foreign key, so
+deleting a material that is still referenced by an assignment is refused to
+avoid dangling assignments.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..errors import ConflictError, NotFoundError
-from ..models import Configuration, Material
+from ..models import Material, MaterialAssignment
 from ..schemas import MaterialCreate, MaterialUpdate
 
 
@@ -50,12 +50,8 @@ def update_material(session: Session, code: str, data: MaterialUpdate) -> Materi
         clash = session.scalar(select(Material).where(Material.code == new_code))
         if clash is not None:
             raise ConflictError(f"Material code already exists: {new_code}")
-        # Cascade the rename to saved configurations so references stay valid.
-        session.execute(
-            update(Configuration)
-            .where(Configuration.material_code == material.code)
-            .values(material_code=new_code)
-        )
+        # Assignments reference the material by foreign key (material_id), so a
+        # code rename needs no cascade.
         material.code = new_code
 
     for key, value in payload.items():
@@ -68,18 +64,19 @@ def update_material(session: Session, code: str, data: MaterialUpdate) -> Materi
 def delete_material(session: Session, code: str) -> Material:
     material = get_material(session, code)
 
-    reference_count = (
-        session.scalar(
-            select(func.count(Configuration.configuration_id)).where(
-                Configuration.material_code == code
-            )
+    usages = session.scalars(
+        select(MaterialAssignment)
+        .where(MaterialAssignment.material_id == material.material_id)
+        .order_by(MaterialAssignment.binding_name)
+    ).all()
+    if usages:
+        detail = "; ".join(
+            f"{usage.finish_scheme.code} -> {usage.binding_name}" for usage in usages
         )
-        or 0
-    )
-    if reference_count > 0:
         raise ConflictError(
-            f"Cannot delete material '{code}': it is referenced by "
-            f"{reference_count} saved configuration(s)."
+            f"Cannot delete material '{code}': it is used by "
+            f"{len(usages)} assignment(s): {detail}. Reassign or remove those "
+            "assignments first."
         )
 
     session.delete(material)

@@ -26,7 +26,7 @@ def resolve_configuration(
         session,
         gang_count=request.gang_count,
         module_type_code=request.module_type,
-        material_code=request.material,
+        finish_scheme_code=request.finish_scheme,
     )
 
 
@@ -57,7 +57,7 @@ def read_configuration(
         session,
         gang_count=configuration.gang_count,
         module_type_code=configuration.module_type_code,
-        material_code=configuration.material_code,
+        finish_scheme_code=configuration.finish_scheme_code,
     )
     return ConfigurationDetail(
         configuration=ConfigurationSummary.model_validate(configuration),

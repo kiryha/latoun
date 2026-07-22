@@ -19,7 +19,7 @@ export function BomPanel({ bom }: BomPanelProps) {
             <th>Component</th>
             <th>Code</th>
             <th>Qty</th>
-            <th>Material</th>
+            <th>Finish</th>
           </tr>
         </thead>
         <tbody>
@@ -28,7 +28,7 @@ export function BomPanel({ bom }: BomPanelProps) {
               <td>{line.display_name}</td>
               <td className="mono">{line.component_code}</td>
               <td>{line.quantity}</td>
-              <td className="capitalize">{line.material}</td>
+              <td className="capitalize">{line.finish_scheme}</td>
             </tr>
           ))}
         </tbody>

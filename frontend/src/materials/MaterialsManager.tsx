@@ -181,7 +181,6 @@ export function MaterialsManager() {
                     {m.display_name}
                     {!m.is_active && <em className="material-flag"> · inactive</em>}
                   </span>
-                  <span className="mono material-code">{m.code}</span>
                 </button>
               </li>
             ))}

@@ -1,5 +1,8 @@
 // Top-level configurator: owns selection state, talks to the backend, and
 // renders the 3D preview, option panel, summary, prototype BOM, and saved list.
+//
+// The customer-facing selector chooses a FINISH scheme (brass, steel, …). A
+// finish scheme resolves multiple render materials per semantic binding.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../api/client";
@@ -16,15 +19,16 @@ import type {
 import { downloadConfigurationJson } from "./exportConfiguration";
 
 const DEFAULT_MODULE_TYPE = "dimmer";
-const DEFAULT_MATERIAL = "brass";
+const DEFAULT_FINISH_SCHEME = "brass";
 const GANG_COUNT = 1;
 
 export function Configurator() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [moduleType, setModuleType] = useState(DEFAULT_MODULE_TYPE);
-  const [material, setMaterial] = useState(DEFAULT_MATERIAL);
+  const [finishScheme, setFinishScheme] = useState(DEFAULT_FINISH_SCHEME);
 
   const [renderState, setRenderState] = useState<RenderState | null>(null);
+  const [missingBindings, setMissingBindings] = useState<string[]>([]);
   const [savedConfigurations, setSavedConfigurations] = useState<
     ConfigurationSummary[]
   >([]);
@@ -51,6 +55,15 @@ export function Configurator() {
       try {
         const loadedCatalog = await api.getCatalog();
         setCatalog(loadedCatalog);
+        // Default to the first customer-visible finish scheme if brass is absent.
+        if (
+          loadedCatalog.finish_schemes.length > 0 &&
+          !loadedCatalog.finish_schemes.some(
+            (scheme) => scheme.code === DEFAULT_FINISH_SCHEME,
+          )
+        ) {
+          setFinishScheme(loadedCatalog.finish_schemes[0].code);
+        }
       } catch (err) {
         setError(
           err instanceof ApiError
@@ -68,11 +81,12 @@ export function Configurator() {
     (async () => {
       setIsResolving(true);
       setError(null);
+      setMissingBindings([]);
       try {
         const resolved = await api.resolveConfiguration({
           gang_count: GANG_COUNT,
           module_type: moduleType,
-          material,
+          finish_scheme: finishScheme,
         });
         if (!cancelled) setRenderState(resolved);
       } catch (err) {
@@ -86,7 +100,7 @@ export function Configurator() {
     return () => {
       cancelled = true;
     };
-  }, [moduleType, material]);
+  }, [moduleType, finishScheme]);
 
   const handleSelectModule = (code: string) => {
     setModuleType(code);
@@ -96,8 +110,8 @@ export function Configurator() {
     setSuccessMessage(null);
   };
 
-  const handleSelectMaterial = (code: string) => {
-    setMaterial(code);
+  const handleSelectFinish = (code: string) => {
+    setFinishScheme(code);
     setActiveConfigCode(null);
     setActiveConfigId(null);
     setSuccessMessage(null);
@@ -111,7 +125,7 @@ export function Configurator() {
       const saved = await api.saveConfiguration({
         gang_count: GANG_COUNT,
         module_type: moduleType,
-        material,
+        finish_scheme: finishScheme,
       });
       setActiveConfigCode(saved.configuration_code);
       setActiveConfigId(saved.configuration_id);
@@ -130,7 +144,7 @@ export function Configurator() {
     try {
       const detail = await api.getConfiguration(configurationId);
       setModuleType(detail.configuration.module_type_code);
-      setMaterial(detail.configuration.material_code);
+      setFinishScheme(detail.configuration.finish_scheme_code);
       setRenderState(detail.render_state);
       setActiveConfigCode(detail.configuration.configuration_code);
       setActiveConfigId(detail.configuration.configuration_id);
@@ -147,6 +161,10 @@ export function Configurator() {
     downloadConfigurationJson(renderState, activeConfigCode);
   };
 
+  const handleMissingBindings = useCallback((bindings: string[]) => {
+    setMissingBindings(bindings);
+  }, []);
+
   const moduleOptions = useMemo(
     () =>
       catalog?.module_types.map((mt) => ({
@@ -156,21 +174,32 @@ export function Configurator() {
     [catalog],
   );
 
-  const materialOptions = useMemo(
+  const finishOptions = useMemo(
     () =>
-      catalog?.materials.map((m) => ({
-        code: m.code,
-        label: m.display_name,
+      catalog?.finish_schemes.map((scheme) => ({
+        code: scheme.code,
+        label: scheme.display_name,
       })) ?? [],
     [catalog],
   );
+
+  const finishDisplayName = useMemo(() => {
+    const scheme = catalog?.finish_schemes.find(
+      (item) => item.code === finishScheme,
+    );
+    return scheme?.display_name ?? finishScheme;
+  }, [catalog, finishScheme]);
 
   return (
     <>
       <div className="app-body">
         <main className="viewport">
           {renderState ? (
-            <Scene renderState={renderState} onAssetError={setError} />
+            <Scene
+              renderState={renderState}
+              onAssetError={setError}
+              onMissingBindings={handleMissingBindings}
+            />
           ) : (
             <div className="viewport-message">
               {error ? "Configuration unavailable." : "Loading configurator…"}
@@ -192,6 +221,21 @@ export function Configurator() {
               {successMessage}
             </Banner>
           )}
+          {missingBindings.length > 0 && (
+            <Banner kind="error">
+              <strong>Missing material assignment</strong>
+              <br />
+              Finish scheme: {finishDisplayName}
+              <br />
+              {missingBindings.length === 1
+                ? "Binding: "
+                : "Bindings: "}
+              {missingBindings.map((b) => (b === "" ? "(empty)" : b)).join(", ")}
+              <br />
+              No assignment was found in {finishDisplayName} or Init. Affected
+              geometry is shown in magenta.
+            </Banner>
+          )}
 
           <section className="option-group">
             <label className="option-label">Device</label>
@@ -204,11 +248,11 @@ export function Configurator() {
           </section>
 
           <section className="option-group">
-            <label className="option-label">Material</label>
+            <label className="option-label">Finish</label>
             <SegmentedControl
-              options={materialOptions}
-              value={material}
-              onChange={handleSelectMaterial}
+              options={finishOptions}
+              value={finishScheme}
+              onChange={handleSelectFinish}
               disabled={!catalog}
             />
           </section>
@@ -232,10 +276,8 @@ export function Configurator() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Material</dt>
-                  <dd className="capitalize">
-                    {renderState.material.display_name}
-                  </dd>
+                  <dt>Finish</dt>
+                  <dd>{finishDisplayName}</dd>
                 </div>
               </dl>
             ) : (

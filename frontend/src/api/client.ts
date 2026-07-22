@@ -2,14 +2,22 @@
 // backend; this module only transports semantic codes and resolved state.
 
 import type {
+  BulkAssignmentsRequest,
   Catalog,
   ConfigurationDetail,
   ConfigurationRequest,
   ConfigurationSummary,
+  FinishScheme,
+  FinishSchemeCreate,
+  FinishSchemeUpdate,
   MaterialAdmin,
+  MaterialAssignment,
+  MaterialAssignmentCreate,
+  MaterialAssignmentUpdate,
   MaterialCreate,
   MaterialUpdate,
   RenderState,
+  ResolvedAssignments,
 } from "../types";
 
 // Empty base -> use Vite proxy ("/api"). Override with VITE_API_BASE if needed.
@@ -92,6 +100,80 @@ export const api = {
 
   deleteMaterial: (code: string) =>
     request<MaterialAdmin>(`/api/materials/${code}`, {
+      method: "DELETE",
+    }),
+
+  // Finish schemes ---------------------------------------------------------- //
+  listFinishSchemes: (params?: {
+    isActive?: boolean;
+    isCustomerVisible?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.isActive !== undefined)
+      query.set("is_active", String(params.isActive));
+    if (params?.isCustomerVisible !== undefined)
+      query.set("is_customer_visible", String(params.isCustomerVisible));
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<FinishScheme[]>(`/api/finish-schemes${suffix}`);
+  },
+
+  createFinishScheme: (payload: FinishSchemeCreate) =>
+    request<FinishScheme>("/api/finish-schemes", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateFinishScheme: (id: number, payload: FinishSchemeUpdate) =>
+    request<FinishScheme>(`/api/finish-schemes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteFinishScheme: (id: number) =>
+    request<FinishScheme>(`/api/finish-schemes/${id}`, {
+      method: "DELETE",
+    }),
+
+  resolvedAssignments: (code: string) =>
+    request<ResolvedAssignments>(
+      `/api/finish-schemes/${code}/resolved-assignments`,
+    ),
+
+  // Material assignments ---------------------------------------------------- //
+  listAssignments: (finishSchemeId: number) =>
+    request<MaterialAssignment[]>(
+      `/api/finish-schemes/${finishSchemeId}/assignments`,
+    ),
+
+  createAssignment: (finishSchemeId: number, payload: MaterialAssignmentCreate) =>
+    request<MaterialAssignment>(
+      `/api/finish-schemes/${finishSchemeId}/assignments`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
+
+  bulkSaveAssignments: (
+    finishSchemeId: number,
+    payload: BulkAssignmentsRequest,
+  ) =>
+    request<MaterialAssignment[]>(
+      `/api/finish-schemes/${finishSchemeId}/assignments`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+    ),
+
+  updateAssignment: (id: number, payload: MaterialAssignmentUpdate) =>
+    request<MaterialAssignment>(`/api/material-assignments/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteAssignment: (id: number) =>
+    request<MaterialAssignment>(`/api/material-assignments/${id}`, {
       method: "DELETE",
     }),
 };
