@@ -7,13 +7,55 @@
 // material and are reported so the UI can surface a visible warning.
 //
 // Supports meshes with a single material and meshes with a material array.
+//
+// The original imported binding is stored on mesh.userData so re-application
+// (React Strict Mode, finish-scheme changes) does not read the already-applied
+// render material name (e.g. "material.brass_brushed").
 
 import * as THREE from "three";
 import { createMissingBindingMaterial } from "./materials";
 
+const SEMANTIC_BINDING_KEY = "latounSemanticBinding";
+
 export interface MaterialApplicationResult {
   // Binding names that could not be resolved (empty name is reported as "").
   missingBindings: string[];
+}
+
+function bindingStorageKey(slotIndex: number | null): string {
+  return slotIndex === null
+    ? SEMANTIC_BINDING_KEY
+    : `${SEMANTIC_BINDING_KEY}:${slotIndex}`;
+}
+
+function readStoredBinding(
+  mesh: THREE.Mesh,
+  slotIndex: number | null,
+): string | null {
+  const stored = mesh.userData[bindingStorageKey(slotIndex)];
+  return typeof stored === "string" ? stored : null;
+}
+
+function rememberBinding(
+  mesh: THREE.Mesh,
+  slotIndex: number | null,
+  bindingName: string,
+): void {
+  mesh.userData[bindingStorageKey(slotIndex)] = bindingName;
+}
+
+function bindingNameFromMaterial(
+  mesh: THREE.Mesh,
+  originalMaterial: THREE.Material,
+  slotIndex: number | null,
+): string {
+  const stored = readStoredBinding(mesh, slotIndex);
+  if (stored !== null) {
+    return stored;
+  }
+  const bindingName = (originalMaterial.name ?? "").trim().toLowerCase();
+  rememberBinding(mesh, slotIndex, bindingName);
+  return bindingName;
 }
 
 export function applySemanticMaterials(
@@ -23,8 +65,16 @@ export function applySemanticMaterials(
 ): MaterialApplicationResult {
   const missingBindings = new Set<string>();
 
-  const resolveOne = (originalMaterial: THREE.Material): THREE.Material => {
-    const bindingName = (originalMaterial.name ?? "").trim().toLowerCase();
+  const resolveOne = (
+    mesh: THREE.Mesh,
+    originalMaterial: THREE.Material,
+    slotIndex: number | null,
+  ): THREE.Material => {
+    const bindingName = bindingNameFromMaterial(
+      mesh,
+      originalMaterial,
+      slotIndex,
+    );
     const renderMaterialCode = materialAssignments[bindingName];
 
     if (!renderMaterialCode) {
@@ -46,9 +96,11 @@ export function applySemanticMaterials(
     if (!mesh.isMesh) return;
 
     if (Array.isArray(mesh.material)) {
-      mesh.material = mesh.material.map(resolveOne);
+      mesh.material = mesh.material.map((material, slotIndex) =>
+        resolveOne(mesh, material, slotIndex),
+      );
     } else if (mesh.material) {
-      mesh.material = resolveOne(mesh.material);
+      mesh.material = resolveOne(mesh, mesh.material, null);
     }
 
     mesh.castShadow = true;
@@ -65,11 +117,12 @@ export function collectBindingNames(assetRoot: THREE.Object3D): string[] {
   assetRoot.traverse((sceneObject: THREE.Object3D) => {
     const mesh = sceneObject as THREE.Mesh;
     if (!mesh.isMesh || !mesh.material) return;
-    const materials = Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material];
-    for (const material of materials) {
-      names.add((material.name ?? "").trim().toLowerCase());
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach((material, slotIndex) => {
+        names.add(bindingNameFromMaterial(mesh, material, slotIndex));
+      });
+    } else {
+      names.add(bindingNameFromMaterial(mesh, mesh.material, null));
     }
   });
   return Array.from(names).sort();

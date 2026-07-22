@@ -63,3 +63,13 @@ def read_configuration(
         configuration=ConfigurationSummary.model_validate(configuration),
         render_state=render_state,
     )
+
+
+@router.delete("/{configuration_id}", response_model=ConfigurationSummary)
+def delete_configuration(
+    configuration_id: int, session: Session = Depends(get_session)
+) -> ConfigurationSummary:
+    configuration = configuration_service.delete_configuration(
+        session, configuration_id
+    )
+    return ConfigurationSummary.model_validate(configuration)

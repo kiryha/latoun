@@ -37,6 +37,7 @@ export function Configurator() {
 
   const [isResolving, setIsResolving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -153,6 +154,32 @@ export function Configurator() {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDelete = async (configurationId: number) => {
+    const target = savedConfigurations.find(
+      (config) => config.configuration_id === configurationId,
+    );
+    const label = target?.configuration_code ?? `configuration ${configurationId}`;
+    if (!window.confirm(`Delete saved configuration ${label}?`)) {
+      return;
+    }
+    setDeletingId(configurationId);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      await api.deleteConfiguration(configurationId);
+      if (activeConfigId === configurationId) {
+        setActiveConfigCode(null);
+        setActiveConfigId(null);
+      }
+      setSuccessMessage(`Deleted ${label}.`);
+      await refreshSavedList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -308,6 +335,8 @@ export function Configurator() {
             configurations={savedConfigurations}
             activeId={activeConfigId}
             onLoad={handleLoad}
+            onDelete={handleDelete}
+            deletingId={deletingId}
           />
         </aside>
       </div>

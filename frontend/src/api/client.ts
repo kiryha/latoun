@@ -84,6 +84,11 @@ export const api = {
   getConfiguration: (id: number) =>
     request<ConfigurationDetail>(`/api/configurations/${id}`),
 
+  deleteConfiguration: (id: number) =>
+    request<ConfigurationSummary>(`/api/configurations/${id}`, {
+      method: "DELETE",
+    }),
+
   listMaterials: () => request<MaterialAdmin[]>("/api/materials"),
 
   createMaterial: (payload: MaterialCreate) =>

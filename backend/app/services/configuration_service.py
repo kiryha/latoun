@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, make_transient
 
 from ..errors import NotFoundError
 from ..models import Configuration
@@ -57,4 +57,16 @@ def get_configuration(session: Session, configuration_id: int) -> Configuration:
     configuration = session.get(Configuration, configuration_id)
     if configuration is None:
         raise NotFoundError(f"Configuration not found: {configuration_id}")
+    return configuration
+
+
+def delete_configuration(
+    session: Session, configuration_id: int
+) -> Configuration:
+    """Delete a saved configuration and return its last known row values."""
+    configuration = get_configuration(session, configuration_id)
+    session.delete(configuration)
+    session.commit()
+    # Detach so response serialization can still read attributes after delete.
+    make_transient(configuration)
     return configuration

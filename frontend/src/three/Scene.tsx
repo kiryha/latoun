@@ -157,6 +157,13 @@ export function Scene({
   // Aggregate per-asset binding results into unions over the current asset set.
   const missingByAsset = useRef<Record<string, string[]>>({});
   const discoveredByAsset = useRef<Record<string, string[]>>({});
+  const resultEpoch = `${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`;
+  const resultEpochRef = useRef(resultEpoch);
+  if (resultEpochRef.current !== resultEpoch) {
+    resultEpochRef.current = resultEpoch;
+    missingByAsset.current = {};
+    discoveredByAsset.current = {};
+  }
 
   const handleResult = useCallback(
     (assetKey: string, missing: string[], discovered: string[]) => {

@@ -1,11 +1,15 @@
 // Internal Assignments admin: finish schemes, semantic binding rows, and a
-// live assembly preview driven by the same resolve endpoint as Assembly.
+// live preview. With no configuration loaded, the material hero is shown.
+// Selecting a saved configuration loads real assembly geometry; materials
+// always come from the finish scheme being edited.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { Banner } from "../components/Banner";
+import { MaterialPreview } from "../materials/MaterialPreview";
 import { Scene } from "../three/Scene";
 import type {
+  ConfigurationSummary,
   FinishScheme,
   FinishSchemeCreate,
   MaterialAdmin,
@@ -15,8 +19,6 @@ import type {
 import { normalizeBindingName, validateBindingName } from "./bindingNames";
 
 const INIT_SCHEME_CODE = "init";
-const PREVIEW_MODULE_TYPE = "dimmer";
-const PREVIEW_GANG_COUNT = 1;
 
 interface AssignmentDraft {
   clientKey: string;
@@ -70,6 +72,10 @@ export function AssignmentsManager() {
   const [resolvedPreview, setResolvedPreview] = useState<RenderState | null>(null);
   const [discoveredBindings, setDiscoveredBindings] = useState<string[]>([]);
   const [missingBindings, setMissingBindings] = useState<string[]>([]);
+  const [savedConfigurations, setSavedConfigurations] = useState<
+    ConfigurationSummary[]
+  >([]);
+  const [previewConfigId, setPreviewConfigId] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [savingScheme, setSavingScheme] = useState(false);
@@ -91,12 +97,14 @@ export function AssignmentsManager() {
   const loadSchemes = useCallback(async (selectAfterId?: number) => {
     setLoading(true);
     try {
-      const [schemeList, materialList] = await Promise.all([
+      const [schemeList, materialList, savedList] = await Promise.all([
         api.listFinishSchemes(),
         api.listMaterials(),
+        api.listConfigurations(),
       ]);
       setSchemes(schemeList);
       setMaterials(materialList);
+      setSavedConfigurations(savedList);
 
       const target =
         (selectAfterId !== undefined &&
@@ -322,10 +330,46 @@ export function AssignmentsManager() {
     }
   };
 
-  // Preview uses the same /configurations/resolve path as Assembly.
-  useEffect(() => {
-    if (isNewScheme || !selectedScheme) {
+  const handleLoadPreviewConfig = (configurationId: number | null) => {
+    setPreviewConfigId(configurationId);
+    if (configurationId === null) {
       setResolvedPreview(null);
+      setDiscoveredBindings([]);
+      setMissingBindings([]);
+    }
+  };
+
+  const previewConfig = useMemo(
+    () =>
+      savedConfigurations.find(
+        (config) => config.configuration_id === previewConfigId,
+      ) ?? null,
+    [savedConfigurations, previewConfigId],
+  );
+
+  // Hero material for the "None" preview: prefer primary_metal, else first row.
+  const heroMaterial = useMemo(() => {
+    const preferredBinding = assignmentDrafts.find(
+      (row) => normalizeBindingName(row.binding_name) === "primary_metal",
+    );
+    const fallbackRow = preferredBinding ?? assignmentDrafts[0] ?? null;
+    const materialCode = fallbackRow?.material_code;
+    if (!materialCode) {
+      return activeMaterials[0] ?? materials[0] ?? null;
+    }
+    return (
+      materials.find((material) => material.code === materialCode) ??
+      activeMaterials[0] ??
+      null
+    );
+  }, [assignmentDrafts, materials, activeMaterials]);
+
+  // Assembly preview: resolve only when a saved configuration is selected.
+  // Materials always follow the finish scheme being edited.
+  useEffect(() => {
+    if (isNewScheme || !selectedScheme || !previewConfig) {
+      setResolvedPreview(null);
+      setResolvingPreview(false);
       return;
     }
     if (!selectedScheme.is_active) {
@@ -339,8 +383,8 @@ export function AssignmentsManager() {
       setResolvingPreview(true);
       try {
         const resolved = await api.resolveConfiguration({
-          gang_count: PREVIEW_GANG_COUNT,
-          module_type: PREVIEW_MODULE_TYPE,
+          gang_count: previewConfig.gang_count,
+          module_type: previewConfig.module_type_code,
           finish_scheme: selectedScheme.code,
         });
         if (!cancelled) {
@@ -360,7 +404,7 @@ export function AssignmentsManager() {
     return () => {
       cancelled = true;
     };
-  }, [selectedScheme, isNewScheme, savedAssignments]);
+  }, [selectedScheme, isNewScheme, savedAssignments, previewConfig]);
 
   const bindingStatus = useMemo(() => {
     if (!resolvedPreview) return new Map<string, BindingResolution>();
@@ -757,33 +801,72 @@ export function AssignmentsManager() {
       </section>
 
       <section className="material-preview">
-        {isNewScheme ? (
-          <div className="viewport-message">
-            Create the finish scheme before previewing assignments.
-          </div>
-        ) : selectedScheme && !selectedScheme.is_active ? (
-          <div className="viewport-message">
-            Activate this finish scheme to preview with the assembly resolver.
-          </div>
-        ) : resolvedPreview ? (
-          <>
-            <Scene
-              renderState={resolvedPreview}
-              onAssetError={setError}
-              onMissingBindings={setMissingBindings}
-              onDiscoveredBindings={setDiscoveredBindings}
-            />
-            {resolvingPreview && (
-              <div className="viewport-badge">Refreshing preview…</div>
-            )}
-          </>
-        ) : (
-          <div className="viewport-message">
-            {resolvingPreview
-              ? "Resolving preview…"
-              : "Select an active finish scheme to preview."}
+        {!isNewScheme && selectedScheme && (
+          <div className="preview-toolbar">
+            <div className="preview-toolbar-row">
+              <label className="option-label" htmlFor="preview-saved-config">
+                Load configuration
+              </label>
+              <select
+                id="preview-saved-config"
+                className="text-input"
+                value={previewConfigId ?? ""}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  handleLoadPreviewConfig(value ? Number(value) : null);
+                }}
+              >
+                <option value="">None</option>
+                {savedConfigurations.map((config) => (
+                  <option
+                    key={config.configuration_id}
+                    value={config.configuration_id}
+                  >
+                    {config.configuration_code}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
+
+        <div className="preview-viewport">
+          {isNewScheme ? (
+            <div className="viewport-message">
+              Create the finish scheme before previewing assignments.
+            </div>
+          ) : selectedScheme && !selectedScheme.is_active ? (
+            <div className="viewport-message">
+              Activate this finish scheme to preview with the assembly resolver.
+            </div>
+          ) : previewConfigId === null ? (
+            heroMaterial ? (
+              <MaterialPreview material={heroMaterial} />
+            ) : (
+              <div className="viewport-message">
+                Add an assignment to preview a material.
+              </div>
+            )
+          ) : resolvedPreview ? (
+            <>
+              <Scene
+                renderState={resolvedPreview}
+                onAssetError={setError}
+                onMissingBindings={setMissingBindings}
+                onDiscoveredBindings={setDiscoveredBindings}
+              />
+              {resolvingPreview && (
+                <div className="viewport-badge">Refreshing preview…</div>
+              )}
+            </>
+          ) : (
+            <div className="viewport-message">
+              {resolvingPreview
+                ? "Resolving preview…"
+                : "Select an active finish scheme to preview."}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

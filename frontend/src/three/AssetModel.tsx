@@ -34,7 +34,14 @@ export function AssetModel({
   // drei caches by URL. We clone so multiple configurations / hot swaps do not
   // mutate the shared cached scene.
   const { scene } = useGLTF(asset.file);
-  const clonedScene = useMemo(() => scene.clone(true), [scene]);
+
+  // Re-clone when the assignment map changes so finish switches start from the
+  // imported GLB materials, not a previous finish's applied materials.
+  const assignmentSignature = JSON.stringify(materialAssignments);
+  const clonedScene = useMemo(
+    () => scene.clone(true),
+    [scene, assignmentSignature],
+  );
 
   useEffect(() => {
     const discoveredBindings = collectBindingNames(clonedScene);
@@ -44,7 +51,13 @@ export function AssetModel({
       renderMaterials,
     );
     onResult(asset.asset_key, missingBindings, discoveredBindings);
-  }, [clonedScene, materialAssignments, renderMaterials, asset.asset_key, onResult]);
+  }, [
+    clonedScene,
+    materialAssignments,
+    renderMaterials,
+    asset.asset_key,
+    onResult,
+  ]);
 
   // Enforce origin placement per the brief; do not add per-asset transforms.
   clonedScene.position.set(0, 0, 0);
