@@ -81,6 +81,7 @@ export function AssignmentsManager() {
   const [savingScheme, setSavingScheme] = useState(false);
   const [savingAssignments, setSavingAssignments] = useState(false);
   const [resolvingPreview, setResolvingPreview] = useState(false);
+  const [deletingStateId, setDeletingStateId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -336,6 +337,36 @@ export function AssignmentsManager() {
       setResolvedPreview(null);
       setDiscoveredBindings([]);
       setMissingBindings([]);
+    }
+  };
+
+  const handleDeletePreviewAssignmentState = async () => {
+    if (previewAssignmentStateId === null) return;
+    const target = assignmentStates.find(
+      (state) => state.assignment_state_id === previewAssignmentStateId,
+    );
+    const label = target?.display_name ?? `state ${previewAssignmentStateId}`;
+    if (!window.confirm(`Delete assembly state “${label}”?`)) {
+      return;
+    }
+
+    setDeletingStateId(previewAssignmentStateId);
+    setError(null);
+    setSuccess(null);
+    try {
+      await api.deleteAssignmentState(previewAssignmentStateId);
+      setAssignmentStates((prev) =>
+        prev.filter((state) => state.assignment_state_id !== previewAssignmentStateId),
+      );
+      setPreviewAssignmentStateId(null);
+      setResolvedPreview(null);
+      setDiscoveredBindings([]);
+      setMissingBindings([]);
+      setSuccess(`Deleted assembly state “${label}”.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingStateId(null);
     }
   };
 
@@ -803,27 +834,41 @@ export function AssignmentsManager() {
               <label className="option-label" htmlFor="preview-assignment-state">
                 Assembly State
               </label>
-              <select
-                id="preview-assignment-state"
-                className="text-input"
-                value={previewAssignmentStateId ?? ""}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  handleLoadPreviewAssignmentState(
-                    value ? Number(value) : null,
-                  );
-                }}
-              >
-                <option value="">None</option>
-                {assignmentStates.map((state) => (
-                  <option
-                    key={state.assignment_state_id}
-                    value={state.assignment_state_id}
-                  >
-                    {state.display_name}
-                  </option>
-                ))}
-              </select>
+              <div className="saved-row">
+                <select
+                  id="preview-assignment-state"
+                  className="text-input saved-select"
+                  value={previewAssignmentStateId ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    handleLoadPreviewAssignmentState(
+                      value ? Number(value) : null,
+                    );
+                  }}
+                >
+                  <option value="">None</option>
+                  {assignmentStates.map((state) => (
+                    <option
+                      key={state.assignment_state_id}
+                      value={state.assignment_state_id}
+                    >
+                      {state.display_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="button small danger saved-delete"
+                  title="Delete selected assembly state"
+                  aria-label="Delete selected assembly state"
+                  disabled={
+                    previewAssignmentStateId === null || deletingStateId !== null
+                  }
+                  onClick={() => void handleDeletePreviewAssignmentState()}
+                >
+                  {deletingStateId !== null ? "…" : "Delete"}
+                </button>
+              </div>
             </div>
           </div>
         )}
