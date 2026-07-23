@@ -252,7 +252,7 @@ These names are enough while the project supports only one market and one collec
 A future full filename convention can include:
 
 ```text
-latoun_[market]_[collection]_[gang]_[asset_type]_[slot]_[module_type].glb
+latoun_[market]_[collection]_[gang]_[category]_[slot]_[module_type].glb
 ```
 
 Examples:
@@ -341,24 +341,24 @@ Example:
   "schema_version": 1,
   "assets": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "file": "/assets/glb/1gang_plate.glb",
       "coordinate_space": "assembly_origin"
     },
     "hardware.1gang.plate_screws": {
-      "asset_type": "hardware",
+      "category": "hardware",
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.dimmer": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.switch": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_switch.glb",
@@ -368,13 +368,27 @@ Example:
 }
 ```
 
+> **Current shape.** The example above is illustrative. The authoritative,
+> current manifest lives at `config/wall_plates/asset_manifest.json` under a
+> top-level `parts` key, without `schema_version` or `coordinate_space`. The
+> per-entry part category is stored in the `category` field (originally named
+> `asset_type`; legacy documents are migrated on load). There is no
+> product-family "asset" table ? the application assumes a single product,
+> `wall_plates`. See `aset_manifest_manager.md` for the full contract.
+
 ### 10.2 What the Manifest Contains
 
 The manifest can record:
 
+> Note (v0.2): the manifest has two root keys ? `properties` (shared data) and
+> `parts` (the entries). The GLB folder is stored once as
+> `properties.glb_folder` (a relative public URL prefix, e.g.
+> `/assets/wall_plates/`), and each entry's `file` holds only the bare file
+> name. See `aset_manifest_manager.md` for the authoritative shape.
+
 - Semantic asset key
-- GLB path
-- Asset type
+- GLB folder (shared, `properties.glb_folder`) + bare file name (`file`)
+- Category (part category: plate / hardware / slot_module)
 - Module type
 - Gang count
 - Slot position

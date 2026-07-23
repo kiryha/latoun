@@ -7,17 +7,16 @@ import type {
   ManifestValidationResult,
   ModuleTypeOption,
 } from "./types";
-import { WALL_PLATES_PREFIX } from "./types";
 
-const ASSET_TYPES = new Set(["plate", "hardware", "slot_module"]);
+const CATEGORIES = new Set(["plate", "hardware", "slot_module"]);
 
 function resolverIdentity(
   entry: AssetManifestEntry,
 ): string | null {
-  if (entry.asset_type === "plate") {
+  if (entry.category === "plate") {
     return `plate:${entry.gang_count}`;
   }
-  if (entry.asset_type === "hardware") {
+  if (entry.category === "hardware") {
     return `hardware:${entry.hardware_type}:${entry.gang_count}`;
   }
   return `slot_module:${entry.gang_count}:${entry.slot_position}:${entry.module_type}`;
@@ -37,10 +36,10 @@ function validateEntry(
     errors.push({ level: "error", message: "Manifest key is empty.", ...base });
   }
 
-  if (!ASSET_TYPES.has(entry.asset_type)) {
+  if (!CATEGORIES.has(entry.category)) {
     errors.push({
       level: "error",
-      message: `Unrecognized asset_type: ${entry.asset_type}.`,
+      message: `Unrecognized category: ${entry.category}.`,
       ...base,
     });
   }
@@ -63,32 +62,31 @@ function validateEntry(
 
   const file = entry.file?.trim() ?? "";
   if (!file) {
-    errors.push({ level: "error", message: "File path is required.", ...base });
+    errors.push({ level: "error", message: "File name is required.", ...base });
   } else {
-    if (!file.startsWith(WALL_PLATES_PREFIX)) {
+    if (
+      file.includes("/") ||
+      file.includes("\\") ||
+      file.includes("..") ||
+      file.includes("file://")
+    ) {
       errors.push({
         level: "error",
-        message: `File path must begin with ${WALL_PLATES_PREFIX}.`,
+        message:
+          "File must be a bare name (no folders); the folder is set once in the manifest.",
         ...base,
       });
     }
     if (!file.toLowerCase().endsWith(".glb")) {
       errors.push({
         level: "error",
-        message: "File path must end with .glb.",
-        ...base,
-      });
-    }
-    if (file.includes("..") || file.includes("\\") || file.includes("file://")) {
-      errors.push({
-        level: "error",
-        message: "File path contains unsupported or dangerous path characters.",
+        message: "File name must end with .glb.",
         ...base,
       });
     }
   }
 
-  if (entry.asset_type === "slot_module") {
+  if (entry.category === "slot_module") {
     if (!entry.module_type) {
       errors.push({
         level: "error",

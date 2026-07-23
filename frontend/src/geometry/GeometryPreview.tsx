@@ -156,7 +156,7 @@ export function GeometryPreview({
     );
   }
 
-  if (!filePath.startsWith("/assets/wall_plates/") || !filePath.endsWith(".glb")) {
+  if (!filePath.startsWith("/") || !filePath.endsWith(".glb")) {
     return (
       <div className="geometry-preview">
         <div className="geometry-preview-status is-warning">Invalid path</div>
@@ -244,7 +244,7 @@ export function SemanticMaterialsPanel({
 }) {
   return (
     <div className="geometry-preview-meta-block">
-      <h4>Materials Assignment</h4>
+      <h4>Scene Data</h4>
       {!filePath ? (
         <p className="muted">Select an entry to inspect materials.</p>
       ) : !metadata ? (

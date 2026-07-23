@@ -982,7 +982,7 @@ fieldset.option-group {
 .geometry-table td:nth-child(4),
 .geometry-table th:nth-child(5),
 .geometry-table td:nth-child(5) {
-  width: 48px;
+  width: 60px;
 }
 
 .geometry-table th:nth-child(8),

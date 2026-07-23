@@ -286,24 +286,24 @@ Example:
   "schema_version": 2,
   "assets": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "file": "/assets/glb/1gang_plate.glb",
       "coordinate_space": "assembly_origin"
     },
     "hardware.1gang.plate_screws": {
-      "asset_type": "hardware",
+      "category": "hardware",
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.dimmer": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.switch": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_switch.glb",

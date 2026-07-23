@@ -1408,6 +1408,40 @@ Do not make the browser load huge USD scenes.
 }
 ```
 
+## 15.4 Current Wall-Plate Manifest Terminology (v0.1)
+
+The implemented v0.1 geometry pipeline uses a lightweight JSON asset manifest.
+A few terminology decisions keep it unambiguous:
+
+```text
+Product family ("asset"):
+  There is only one product today: wall_plates.
+  There is NO product-family / "asset" database table.
+  Do not model a product family as a "type"; assume a single product.
+
+category (per manifest entry):
+  What kind of part an entry is: plate | hardware | slot_module.
+  Stored in the manifest field `category`.
+  (This field was originally named `asset_type`; it was renamed to avoid
+   colliding with the product "asset" concept. Legacy manifests using
+   `asset_type` are migrated to `category` automatically on load.)
+
+module_type (database-backed):
+  switch | dimmer | outlet | usb_c_outlet.
+  Sub-types a slot_module only. Comes from the `module_types` table.
+  A plate is a `category`, NOT a module_type — never add `plate` to
+  `module_types`.
+
+hardware_type:
+  Sub-types a hardware part (currently only `plate_screws`).
+```
+
+The manifest lives at `config/wall_plates/asset_manifest.json` and the GLB
+files under `frontend/public/assets/wall_plates/`. See
+[docs/coding_briefs/aset_manifest_manager.md](docs/coding_briefs/aset_manifest_manager.md)
+and [docs/coding_briefs/data_management.md](docs/coding_briefs/data_management.md)
+for the full contract.
+
 ---
 
 # 16. API Design Draft

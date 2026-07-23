@@ -12,6 +12,7 @@ from ..schemas import (
     AssetFileStatusOut,
     AssetManifestDocument,
     AssetManifestGetOut,
+    AssetManifestProperties,
     AssetManifestSaveOut,
     AssetManifestSaveRequest,
     AssetManifestValidateOut,
@@ -38,9 +39,12 @@ def list_module_types(session: Session = Depends(get_session)) -> list[ModuleTyp
     response_model=AssetManifestGetOut,
 )
 def get_wall_plate_asset_manifest() -> AssetManifestGetOut:
-    assets, revision = manifest_service.get_manifest_document()
+    assets, glb_folder, revision = manifest_service.get_manifest_document()
     return AssetManifestGetOut(
-        manifest=AssetManifestDocument(parts=assets),
+        manifest=AssetManifestDocument(
+            properties=AssetManifestProperties(glb_folder=glb_folder),
+            parts=assets,
+        ),
         revision=revision,
     )
 
@@ -53,13 +57,17 @@ def save_wall_plate_asset_manifest(
     payload: AssetManifestSaveRequest,
     session: Session = Depends(get_session),
 ) -> AssetManifestSaveOut:
-    assets, revision, warnings = manifest_service.save_manifest(
+    assets, glb_folder, revision, warnings = manifest_service.save_manifest(
         session,
         assets=payload.manifest.parts,
+        glb_folder=payload.manifest.properties.glb_folder,
         expected_revision=payload.expected_revision,
     )
     return AssetManifestSaveOut(
-        manifest=AssetManifestDocument(parts=assets),
+        manifest=AssetManifestDocument(
+            properties=AssetManifestProperties(glb_folder=glb_folder),
+            parts=assets,
+        ),
         revision=revision,
         warnings=warnings,
         saved=True,

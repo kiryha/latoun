@@ -214,7 +214,10 @@ export const api = {
     request<AssetManifestGetResponse>("/api/wall-plates/asset-manifest"),
 
   saveWallPlateAssetManifest: (payload: {
-    manifest: { parts: Record<string, unknown> };
+    manifest: {
+      properties: { glb_folder: string };
+      parts: Record<string, unknown>;
+    };
     expected_revision: string | null;
   }) =>
     request<AssetManifestSaveResponse>("/api/wall-plates/asset-manifest", {

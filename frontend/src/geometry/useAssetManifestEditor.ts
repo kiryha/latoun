@@ -9,18 +9,19 @@ import {
 } from "./assetManifestGenerator";
 import {
   createDefaultEntry,
-  reshapeEntryForAssetType,
+  reshapeEntryForCategory,
   uniqueCopyKey,
 } from "./assetManifestNormalization";
 import { validateWorkingManifest } from "./assetManifestValidation";
 import type {
+  AssetCategory,
   AssetManifest,
   AssetManifestEntry,
-  AssetType,
   EditableManifestEntry,
   EntryEditState,
   ModuleTypeOption,
 } from "./types";
+import { DEFAULT_GLB_FOLDER } from "./types";
 
 let clientIdCounter = 0;
 function nextClientId(): string {
@@ -48,6 +49,7 @@ function markModified(row: EditableManifestEntry): EntryEditState {
 export function useAssetManifestEditor() {
   const [rows, setRows] = useState<EditableManifestEntry[]>([]);
   const [baseline, setBaseline] = useState<AssetManifest | null>(null);
+  const [glbFolder, setGlbFolder] = useState<string>(DEFAULT_GLB_FOLDER);
   const [revision, setRevision] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [moduleTypes, setModuleTypes] = useState<ModuleTypeOption[]>([]);
@@ -77,23 +79,33 @@ export function useAssetManifestEditor() {
       setModuleTypes(types);
       if (types.length > 0) setModuleTypesError(null);
       const nextRows = entriesFromManifest(manifestResponse.manifest);
+      const nextFolder =
+        manifestResponse.manifest.properties?.glb_folder ?? DEFAULT_GLB_FOLDER;
       setRows(nextRows);
+      setGlbFolder(nextFolder);
       setBaseline(structuredClone(manifestResponse.manifest));
       setRevision(manifestResponse.revision);
       setSelectedId(nextRows[0]?.clientId ?? null);
 
-      const paths = nextRows.map((row) => row.value.file);
-      if (paths.length > 0) {
+      // Ask the backend which GLBs exist. We send full public URLs but track
+      // missing state by bare file name (matches how rows store `file`).
+      const files = nextRows
+        .map((row) => row.value.file)
+        .filter((file) => file.trim().length > 0);
+      if (files.length > 0) {
         try {
-          const status = await api.getWallPlateAssetFileStatus(paths);
+          const urls = files.map((file) => `${nextFolder}${file}`);
+          const status = await api.getWallPlateAssetFileStatus(urls);
           const missing = new Set<string>();
-          for (const [path, exists] of Object.entries(status.files)) {
-            if (!exists) missing.add(path);
+          for (const file of files) {
+            if (status.files[`${nextFolder}${file}`] === false) missing.add(file);
           }
           setMissingFiles(missing);
         } catch {
           setMissingFiles(new Set());
         }
+      } else {
+        setMissingFiles(new Set());
       }
     } catch (err) {
       setLoadError(
@@ -168,16 +180,16 @@ export function useAssetManifestEditor() {
   }, []);
 
   const addEntry = useCallback(
-    (assetType: AssetType) => {
+    (category: AssetCategory) => {
       const defaultModule =
         moduleTypes.find((mt) => mt.is_active)?.code ??
         moduleTypes[0]?.code ??
         "switch";
-      const value = createDefaultEntry(assetType, defaultModule);
+      const value = createDefaultEntry(category, defaultModule);
       const preferredKey =
-        assetType === "plate"
+        category === "plate"
           ? "plate.1gang"
-          : assetType === "hardware"
+          : category === "hardware"
             ? "hardware.1gang.plate_screws"
             : `module.1gang.slot01.${defaultModule}`;
       let key = preferredKey;
@@ -257,13 +269,13 @@ export function useAssetManifestEditor() {
     [updateRow],
   );
 
-  const changeAssetType = useCallback(
-    (clientId: string, assetType: AssetType) => {
+  const changeCategory = useCallback(
+    (clientId: string, category: AssetCategory) => {
       const defaultModule =
         moduleTypes.find((mt) => mt.is_active)?.code ?? "switch";
       updateRow(clientId, (row) => ({
         ...row,
-        value: reshapeEntryForAssetType(row.value, assetType, defaultModule),
+        value: reshapeEntryForCategory(row.value, category, defaultModule),
       }));
     },
     [moduleTypes, updateRow],
@@ -313,11 +325,11 @@ export function useAssetManifestEditor() {
     const parts: Record<string, AssetManifestEntry> = {};
     for (const row of rows) {
       if (row.editState === "deleted") continue;
-      // Strip incompatible fields by reshaping through asset type.
-      parts[row.manifestKey.trim()] = reshapeEntryForAssetType(
+      // Strip incompatible fields by reshaping through category.
+      parts[row.manifestKey.trim()] = reshapeEntryForCategory(
         row.value,
-        row.value.asset_type,
-        row.value.asset_type === "slot_module" ? row.value.module_type : "switch",
+        row.value.category,
+        row.value.category === "slot_module" ? row.value.module_type : "switch",
       );
     }
 
@@ -326,11 +338,12 @@ export function useAssetManifestEditor() {
     setSuccess(null);
     try {
       const saved = await api.saveWallPlateAssetManifest({
-        manifest: { parts },
+        manifest: { properties: { glb_folder: glbFolder }, parts },
         expected_revision: revision,
       });
       const nextRows = entriesFromManifest(saved.manifest);
       setRows(nextRows);
+      setGlbFolder(saved.manifest.properties?.glb_folder ?? glbFolder);
       setBaseline(structuredClone(saved.manifest));
       setRevision(saved.revision);
       setSelectedId((current) => {
@@ -362,7 +375,12 @@ export function useAssetManifestEditor() {
     } finally {
       setSaving(false);
     }
-  }, [missingFiles, revision, rows, validation.ok]);
+  }, [glbFolder, missingFiles, revision, rows, validation.ok]);
+
+  const fileUrl = useCallback(
+    (file: string) => (file.trim().length > 0 ? `${glbFolder}${file}` : ""),
+    [glbFolder],
+  );
 
   return {
     rows,
@@ -370,6 +388,8 @@ export function useAssetManifestEditor() {
     selectedId,
     moduleTypes,
     missingFiles,
+    glbFolder,
+    fileUrl,
     validation,
     dirtyCount,
     isDirty,
@@ -387,7 +407,7 @@ export function useAssetManifestEditor() {
     undoDelete,
     setEntryValue,
     setManifestKey,
-    changeAssetType,
+    changeCategory,
     discard,
     save,
     applyBulkGeneration,

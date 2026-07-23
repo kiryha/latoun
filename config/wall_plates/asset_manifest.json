@@ -1,32 +1,35 @@
 {
+  "properties": {
+    "glb_folder": "/assets/wall_plates/"
+  },
   "parts": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "gang_count": 1,
-      "file": "/assets/wall_plates/1gang_plate.glb",
+      "file": "1gang_plate.glb",
       "is_active": true
     },
     "hardware.1gang.plate_screws": {
-      "asset_type": "hardware",
+      "category": "hardware",
       "hardware_type": "plate_screws",
       "gang_count": 1,
-      "file": "/assets/wall_plates/1gang_plate_screws.glb",
+      "file": "1gang_plate_screws.glb",
       "is_active": true
     },
     "module.1gang.slot01.dimmer": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "gang_count": 1,
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "/assets/wall_plates/1gang_slot01_dimmer.glb",
+      "file": "1gang_slot01_dimmer.glb",
       "is_active": true
     },
     "module.1gang.slot01.switch": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "gang_count": 1,
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/wall_plates/1gang_slot01_switch.glb",
+      "file": "1gang_slot01_switch.glb",
       "is_active": true
     }
   }

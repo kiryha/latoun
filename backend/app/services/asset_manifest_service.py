@@ -24,10 +24,15 @@ from ..config import settings
 from ..errors import AssetManifestError, ConflictError, MissingAssetError, ValidationError
 from ..models import ModuleType
 
-ASSET_TYPES = frozenset({"plate", "hardware", "slot_module"})
+CATEGORIES = frozenset({"plate", "hardware", "slot_module"})
 SUPPORTED_GANG_COUNTS = frozenset({1, 2, 3, 4})
 HARDWARE_TYPES = frozenset({"plate_screws"})
-WALL_PLATES_PREFIX = "/assets/wall_plates/"
+# Default public URL folder for GLBs. This is a relative URL prefix (served by
+# Vite from ``frontend/public``); the filesystem base is a backend concern, not
+# manifest content. The manifest may override this via ``properties.glb_folder``.
+DEFAULT_GLB_FOLDER = "/assets/wall_plates/"
+# Back-compat alias (older code/tests referenced this name).
+WALL_PLATES_PREFIX = DEFAULT_GLB_FOLDER
 LEGACY_GLB_PREFIX = "/assets/glb/"
 
 _GANG_FROM_KEY_RE = re.compile(r"(?:^|\.)(\d)gang(?:\.|$)")
@@ -54,8 +59,19 @@ class ManifestValidationResult:
 class AssetManifest:
     """In-memory view of the wall-plate asset manifest."""
 
-    def __init__(self, assets: dict[str, dict]) -> None:
+    def __init__(
+        self, assets: dict[str, dict], glb_folder: str = DEFAULT_GLB_FOLDER
+    ) -> None:
         self.assets = assets
+        self.glb_folder = glb_folder
+
+    def url_for_file(self, file_name: str) -> str:
+        """Join the shared ``glb_folder`` with a bare file name into a URL."""
+        return f"{self.glb_folder}{file_name}"
+
+    def url_for_entry(self, entry: dict) -> str:
+        """Full public URL a GLB entry loads from."""
+        return self.url_for_file(str(entry.get("file", "")))
 
     def get(self, asset_key: str) -> dict:
         try:
@@ -70,12 +86,13 @@ class AssetManifest:
         return self.assets.get(asset_key)
 
     def file_for(self, asset_key: str) -> str:
-        return self.get(asset_key)["file"]
+        """Full public URL for an asset key."""
+        return self.url_for_entry(self.get(asset_key))
 
     def find_active(
         self,
         *,
-        asset_type: str,
+        category: str,
         gang_count: int,
         hardware_type: str | None = None,
         slot_position: int | None = None,
@@ -85,14 +102,14 @@ class AssetManifest:
         for key, entry in self.assets.items():
             if not _is_active(entry):
                 continue
-            if entry.get("asset_type") != asset_type:
+            if entry.get("category") != category:
                 continue
             if int(entry.get("gang_count", -1)) != gang_count:
                 continue
-            if asset_type == "hardware":
+            if category == "hardware":
                 if entry.get("hardware_type") != hardware_type:
                     continue
-            elif asset_type == "slot_module":
+            elif category == "slot_module":
                 if int(entry.get("slot_position", -1)) != slot_position:
                     continue
                 if entry.get("module_type") != module_type:
@@ -129,21 +146,30 @@ def migrate_entry(key: str, raw: dict[str, Any]) -> dict[str, Any]:
     entry.pop("schema_version", None)
     entry.pop("coordinate_space", None)
 
-    asset_type = entry.get("asset_type")
+    # Backward compatibility: the field was renamed ``asset_type`` -> ``category``.
+    # Accept legacy documents on load and normalize them to ``category``.
+    if "asset_type" in entry:
+        legacy_category = entry.pop("asset_type")
+        entry.setdefault("category", legacy_category)
+
+    category = entry.get("category")
     gang_count = _derive_gang_count(key, entry)
     if gang_count is not None:
         entry["gang_count"] = gang_count
 
+    # ``file`` now holds only the file name; the folder lives in
+    # ``properties.glb_folder``. Reduce any legacy full/relative path to its
+    # basename so old manifests migrate cleanly.
     file_path = entry.get("file")
-    if isinstance(file_path, str) and file_path.startswith(LEGACY_GLB_PREFIX):
-        entry["file"] = WALL_PLATES_PREFIX + file_path[len(LEGACY_GLB_PREFIX) :]
+    if isinstance(file_path, str):
+        entry["file"] = file_path.replace("\\", "/").rsplit("/", 1)[-1]
 
     if "is_active" not in entry:
         entry["is_active"] = True
     else:
         entry["is_active"] = bool(entry["is_active"])
 
-    if asset_type == "hardware" and "hardware_type" not in entry:
+    if category == "hardware" and "hardware_type" not in entry:
         entry["hardware_type"] = "plate_screws"
 
     return entry
@@ -168,28 +194,52 @@ def migrate_manifest(raw: dict[str, Any]) -> dict[str, dict]:
     return migrated
 
 
-def compute_revision(assets: dict[str, dict]) -> str:
+def normalize_glb_folder(value: Any) -> str:
+    """Return a clean public URL folder, defaulting when missing/invalid."""
+    if not isinstance(value, str) or not value.strip():
+        return DEFAULT_GLB_FOLDER
+    folder = value.strip()
+    if not folder.startswith("/"):
+        folder = "/" + folder
+    if not folder.endswith("/"):
+        folder = folder + "/"
+    return folder
+
+
+def parse_glb_folder(raw: dict[str, Any]) -> str:
+    """Extract ``properties.glb_folder`` from a raw document (with default)."""
+    properties = raw.get("properties")
+    if isinstance(properties, dict):
+        return normalize_glb_folder(properties.get("glb_folder"))
+    return DEFAULT_GLB_FOLDER
+
+
+def compute_revision(assets: dict[str, dict], glb_folder: str) -> str:
     """Stable content hash used as an optimistic-concurrency token."""
     normalized = normalize_manifest_assets(assets)
-    payload = json.dumps({"parts": normalized}, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(
+        {"properties": {"glb_folder": glb_folder}, "parts": normalized},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"sha256-{digest}"
 
 
 def _ordered_entry_fields(entry: dict) -> dict[str, Any]:
-    asset_type = entry.get("asset_type")
+    category = entry.get("category")
     ordered: dict[str, Any] = {}
-    if asset_type == "plate":
-        for key in ("asset_type", "gang_count", "file", "is_active"):
+    if category == "plate":
+        for key in ("category", "gang_count", "file", "is_active"):
             if key in entry:
                 ordered[key] = entry[key]
-    elif asset_type == "hardware":
-        for key in ("asset_type", "hardware_type", "gang_count", "file", "is_active"):
+    elif category == "hardware":
+        for key in ("category", "hardware_type", "gang_count", "file", "is_active"):
             if key in entry:
                 ordered[key] = entry[key]
-    elif asset_type == "slot_module":
+    elif category == "slot_module":
         for key in (
-            "asset_type",
+            "category",
             "gang_count",
             "module_type",
             "slot_position",
@@ -212,9 +262,9 @@ def _sort_key_for_entry(
     entry: dict,
     module_type_order: dict[str, int] | None = None,
 ) -> tuple:
-    asset_type = entry.get("asset_type")
+    category = entry.get("category")
     type_rank = {"plate": 0, "hardware": 1, "slot_module": 2}.get(
-        str(asset_type), 99
+        str(category), 99
     )
     gang = entry.get("gang_count", 99)
     try:
@@ -249,10 +299,15 @@ def normalize_manifest_assets(
 def serialize_manifest(
     assets: dict[str, dict],
     *,
+    glb_folder: str = DEFAULT_GLB_FOLDER,
     module_type_order: dict[str, int] | None = None,
 ) -> str:
     normalized = normalize_manifest_assets(assets, module_type_order=module_type_order)
-    return json.dumps({"parts": normalized}, indent=2, ensure_ascii=False) + "\n"
+    document = {
+        "properties": {"glb_folder": normalize_glb_folder(glb_folder)},
+        "parts": normalized,
+    }
+    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
 
 
 def _load_raw_from_disk(path: Path) -> dict[str, Any]:
@@ -272,7 +327,7 @@ def _load_manifest_from_disk(path: Path) -> AssetManifest:
     assets = migrate_manifest(raw)
     if not assets:
         raise AssetManifestError("Asset manifest has no 'parts' section.")
-    return AssetManifest(assets=assets)
+    return AssetManifest(assets=assets, glb_folder=parse_glb_folder(raw))
 
 
 @lru_cache(maxsize=1)
@@ -290,12 +345,13 @@ def clear_manifest_cache() -> None:
     _cached_manifest.cache_clear()
 
 
-def get_manifest_document() -> tuple[dict[str, dict], str]:
-    """Return ``(assets, revision)`` for the Geometry editor GET endpoint."""
+def get_manifest_document() -> tuple[dict[str, dict], str, str]:
+    """Return ``(assets, glb_folder, revision)`` for the Geometry GET endpoint."""
     clear_manifest_cache()
     manifest = get_asset_manifest()
     assets = normalize_manifest_assets(manifest.assets)
-    return assets, compute_revision(assets)
+    glb_folder = manifest.glb_folder
+    return assets, glb_folder, compute_revision(assets, glb_folder)
 
 
 def _module_type_codes(session: Session) -> dict[str, ModuleType]:
@@ -309,16 +365,16 @@ def _module_type_sort_order(session: Session) -> dict[str, int]:
 
 
 def _resolver_identity(key: str, entry: dict) -> tuple | None:
-    asset_type = entry.get("asset_type")
+    category = entry.get("category")
     try:
         gang = int(entry.get("gang_count"))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    if asset_type == "plate":
+    if category == "plate":
         return ("plate", gang)
-    if asset_type == "hardware":
+    if category == "hardware":
         return ("hardware", entry.get("hardware_type"), gang)
-    if asset_type == "slot_module":
+    if category == "slot_module":
         try:
             slot = int(entry.get("slot_position"))  # type: ignore[arg-type]
         except (TypeError, ValueError):
@@ -328,32 +384,26 @@ def _resolver_identity(key: str, entry: dict) -> tuple | None:
 
 
 def _validate_file_path(key: str, file_path: Any, result: ManifestValidationResult) -> None:
+    """Validate the bare GLB file name (the folder lives in properties.glb_folder)."""
     if not isinstance(file_path, str) or not file_path.strip():
         result.errors.append(
-            ManifestIssue("error", "File path is required.", asset_key=key)
+            ManifestIssue("error", "File name is required.", asset_key=key)
         )
         return
-    path = file_path.strip()
-    if _DANGEROUS_PATH_RE.search(path) or "\\" in path:
+    name = file_path.strip()
+    if "/" in name or "\\" in name or _DANGEROUS_PATH_RE.search(name):
         result.errors.append(
             ManifestIssue(
                 "error",
-                "File path contains unsupported or dangerous path characters.",
+                "File must be a bare name (no folders); the folder is set once in "
+                "properties.glb_folder.",
                 asset_key=key,
             )
         )
         return
-    if not path.startswith(WALL_PLATES_PREFIX):
+    if not name.lower().endswith(".glb"):
         result.errors.append(
-            ManifestIssue(
-                "error",
-                f"File path must begin with {WALL_PLATES_PREFIX}.",
-                asset_key=key,
-            )
-        )
-    if not path.lower().endswith(".glb"):
-        result.errors.append(
-            ManifestIssue("error", "File path must end with .glb.", asset_key=key)
+            ManifestIssue("error", "File name must end with .glb.", asset_key=key)
         )
 
 
@@ -399,12 +449,12 @@ def validate_manifest(
             )
             continue
 
-        asset_type = entry.get("asset_type")
-        if asset_type not in ASSET_TYPES:
+        category = entry.get("category")
+        if category not in CATEGORIES:
             result.errors.append(
                 ManifestIssue(
                     "error",
-                    f"Unrecognized asset_type: {asset_type!r}.",
+                    f"Unrecognized category: {category!r}.",
                     asset_key=key,
                 )
             )
@@ -441,7 +491,7 @@ def validate_manifest(
 
         _validate_file_path(key, entry.get("file"), result)
 
-        if asset_type == "plate":
+        if category == "plate":
             for forbidden in ("hardware_type", "module_type", "slot_position"):
                 if forbidden in entry:
                     result.errors.append(
@@ -451,7 +501,7 @@ def validate_manifest(
                             asset_key=key,
                         )
                     )
-        elif asset_type == "hardware":
+        elif category == "hardware":
             hardware_type = entry.get("hardware_type")
             if hardware_type not in HARDWARE_TYPES:
                 result.errors.append(
@@ -470,7 +520,7 @@ def validate_manifest(
                             asset_key=key,
                         )
                     )
-        elif asset_type == "slot_module":
+        elif category == "slot_module":
             if "hardware_type" in entry:
                 result.errors.append(
                     ManifestIssue(
@@ -586,14 +636,17 @@ def save_manifest(
     session: Session,
     *,
     assets: dict[str, dict],
+    glb_folder: str = DEFAULT_GLB_FOLDER,
     expected_revision: str | None,
-) -> tuple[dict[str, dict], str, list[str]]:
-    """Validate, atomically write, and return ``(assets, revision, warnings)``."""
+) -> tuple[dict[str, dict], str, str, list[str]]:
+    """Validate, atomically write, return ``(assets, glb_folder, revision, warnings)``."""
     path = settings.asset_manifest_path
     if not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    current_assets, current_revision = get_manifest_document()
+    glb_folder = normalize_glb_folder(glb_folder)
+
+    _current_assets, _current_folder, current_revision = get_manifest_document()
     if expected_revision is not None and expected_revision != current_revision:
         raise ConflictError(
             "The manifest changed on disk after it was loaded. Reload it before saving."
@@ -605,29 +658,31 @@ def save_manifest(
         if not isinstance(raw_entry, dict):
             raise ValidationError(f"Asset entry '{key}' must be an object.")
         entry = migrate_entry(key, raw_entry)
-        asset_type = entry.get("asset_type")
-        if asset_type == "plate":
+        category = entry.get("category")
+        if category == "plate":
             entry.pop("hardware_type", None)
             entry.pop("module_type", None)
             entry.pop("slot_position", None)
-        elif asset_type == "hardware":
+        elif category == "hardware":
             entry.pop("module_type", None)
             entry.pop("slot_position", None)
-        elif asset_type == "slot_module":
+        elif category == "slot_module":
             entry.pop("hardware_type", None)
         cleaned[key] = entry
 
     result = validate_and_raise(cleaned, session=session)
     module_order = _module_type_sort_order(session)
-    text = serialize_manifest(cleaned, module_type_order=module_order)
+    text = serialize_manifest(
+        cleaned, glb_folder=glb_folder, module_type_order=module_order
+    )
     normalized = normalize_manifest_assets(cleaned, module_type_order=module_order)
 
     _atomic_write(path, text)
     clear_manifest_cache()
 
-    revision = compute_revision(normalized)
+    revision = compute_revision(normalized, glb_folder)
     warnings = [issue.message for issue in result.warnings]
-    return normalized, revision, warnings
+    return normalized, glb_folder, revision, warnings
 
 
 def _atomic_write(path: Path, text: str) -> None:

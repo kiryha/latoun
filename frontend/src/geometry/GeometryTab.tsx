@@ -10,9 +10,9 @@ import {
   type PreviewMetadata,
 } from "./GeometryPreview";
 import {
-  ASSET_TYPE_LABELS,
+  CATEGORY_LABELS,
   GANG_COUNTS,
-  type AssetType,
+  type AssetCategory,
   type EditableManifestEntry,
   type GangCount,
 } from "./types";
@@ -39,7 +39,7 @@ interface GeometryTabProps {
 export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
   const editor = useAssetManifestEditor();
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<AssetType | "all">("all");
+  const [filterType, setFilterType] = useState<AssetCategory | "all">("all");
   const [filterGang, setFilterGang] = useState<GangCount | "all">("all");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">(
     "all",
@@ -64,7 +64,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
 
     let list = [...editor.rows];
     if (filterType !== "all") {
-      list = list.filter((row) => row.value.asset_type === filterType);
+      list = list.filter((row) => row.value.category === filterType);
     }
     if (filterGang !== "all") {
       list = list.filter((row) => row.value.gang_count === filterGang);
@@ -81,13 +81,13 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
     if (query) {
       list = list.filter((row) => {
         const moduleCode =
-          row.value.asset_type === "slot_module" ? row.value.module_type : "";
+          row.value.category === "slot_module" ? row.value.module_type : "";
         const haystack = [
           row.manifestKey,
           row.value.file,
           moduleCode,
           moduleLabel(moduleCode),
-          row.value.asset_type,
+          row.value.category,
         ]
           .join(" ")
           .toLowerCase();
@@ -100,16 +100,16 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
       const statusA = entryStatusLabel(a, editor.validation, editor.missingFiles);
       const statusB = entryStatusLabel(b, editor.validation, editor.missingFiles);
       const slotA =
-        a.value.asset_type === "slot_module" ? a.value.slot_position : 0;
+        a.value.category === "slot_module" ? a.value.slot_position : 0;
       const slotB =
-        b.value.asset_type === "slot_module" ? b.value.slot_position : 0;
+        b.value.category === "slot_module" ? b.value.slot_position : 0;
       const moduleA =
-        a.value.asset_type === "slot_module" ? a.value.module_type : "";
+        a.value.category === "slot_module" ? a.value.module_type : "";
       const moduleB =
-        b.value.asset_type === "slot_module" ? b.value.module_type : "";
+        b.value.category === "slot_module" ? b.value.module_type : "";
       switch (sortKey) {
         case "type":
-          return a.value.asset_type.localeCompare(b.value.asset_type) * dir;
+          return a.value.category.localeCompare(b.value.category) * dir;
         case "gang":
           return (a.value.gang_count - b.value.gang_count) * dir;
         case "slot":
@@ -214,22 +214,22 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                   onClick={() => setAddMenuOpen((open) => !open)}
                   disabled={!!editor.loadError}
                 >
-                  Add Entry
+                  Add Part
                 </button>
                 {addMenuOpen && (
                   <div className="geometry-add-menu" role="menu">
-                    {(["plate", "hardware", "slot_module"] as AssetType[]).map(
-                      (type) => (
+                    {(["plate", "hardware", "slot_module"] as AssetCategory[]).map(
+                      (category) => (
                         <button
-                          key={type}
+                          key={category}
                           type="button"
                           role="menuitem"
                           onClick={() => {
-                            editor.addEntry(type);
+                            editor.addEntry(category);
                             setAddMenuOpen(false);
                           }}
                         >
-                          {ASSET_TYPE_LABELS[type]}
+                          {CATEGORY_LABELS[category]}
                         </button>
                       ),
                     )}
@@ -242,7 +242,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                 onClick={openGenerator}
                 disabled={!!editor.loadError}
               >
-                Add Entries
+                Add Parts
               </button>
               <button
                 type="button"
@@ -271,13 +271,13 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                 placeholder="Search"
               />
               <select
-                aria-label="Asset type"
+                aria-label="Category"
                 value={filterType}
                 onChange={(event) =>
-                  setFilterType(event.target.value as AssetType | "all")
+                  setFilterType(event.target.value as AssetCategory | "all")
                 }
               >
-                <option value="all">ASSET TYPE</option>
+                <option value="all">CATEGORY</option>
                 <option value="plate">Plate</option>
                 <option value="hardware">Hardware</option>
                 <option value="slot_module">Slot Module</option>
@@ -332,7 +332,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                     </th>
                     <th>
                       <button type="button" onClick={() => toggleSort("type")}>
-                        Asset Type
+                        Category
                       </button>
                     </th>
                     <th>
@@ -405,15 +405,15 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                             </em>
                           )}
                         </td>
-                        <td>{ASSET_TYPE_LABELS[row.value.asset_type]}</td>
+                        <td>{CATEGORY_LABELS[row.value.category]}</td>
                         <td>{row.value.gang_count}</td>
                         <td>
-                          {row.value.asset_type === "slot_module"
+                          {row.value.category === "slot_module"
                             ? row.value.slot_position
                             : "—"}
                         </td>
                         <td>
-                          {row.value.asset_type === "slot_module"
+                          {row.value.category === "slot_module"
                             ? (() => {
                                 const moduleCode = row.value.module_type;
                                 return (
@@ -422,13 +422,13 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                                   )?.display_name ?? moduleCode
                                 );
                               })()
-                            : row.value.asset_type === "hardware"
+                            : row.value.category === "hardware"
                               ? hardwareLabel(row.value.hardware_type)
                               : "—"}
                         </td>
                         <td
                           className="geometry-file-cell"
-                          title={row.value.file}
+                          title={editor.fileUrl(row.value.file)}
                         >
                           <code>{row.value.file}</code>
                         </td>
@@ -510,7 +510,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
           <GeometryPreview
             filePath={
               selected && selected.editState !== "deleted"
-                ? selected.value.file
+                ? editor.fileUrl(selected.value.file)
                 : null
             }
             missingFile={
@@ -520,7 +520,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
           />
           <div className="geometry-side-scroll">
             <section className="geometry-editor">
-              <h3>Scene Data</h3>
+              <h3>Part Data</h3>
               {!selected ? (
                 <p className="muted">Select an entry to edit.</p>
               ) : (
@@ -531,8 +531,8 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                   onKeyChange={(key) =>
                     editor.setManifestKey(selected.clientId, key)
                   }
-                  onAssetTypeChange={(type) =>
-                    editor.changeAssetType(selected.clientId, type)
+                  onCategoryChange={(category) =>
+                    editor.changeCategory(selected.clientId, category)
                   }
                   onValueChange={(value) =>
                     editor.setEntryValue(selected.clientId, value)
@@ -544,7 +544,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
               metadata={previewMetadata}
               filePath={
                 selected && selected.editState !== "deleted"
-                  ? selected.value.file
+                  ? editor.fileUrl(selected.value.file)
                   : null
               }
             />
@@ -715,21 +715,21 @@ function EntryEditor({
   moduleTypes,
   moduleTypesError,
   onKeyChange,
-  onAssetTypeChange,
+  onCategoryChange,
   onValueChange,
 }: {
   row: EditableManifestEntry;
   moduleTypes: ReturnType<typeof useAssetManifestEditor>["moduleTypes"];
   moduleTypesError: string | null;
   onKeyChange: (key: string) => void;
-  onAssetTypeChange: (type: AssetType) => void;
+  onCategoryChange: (category: AssetCategory) => void;
   onValueChange: (value: EditableManifestEntry["value"]) => void;
 }) {
   const value = row.value;
   const disabled = row.editState === "deleted";
   const activeModuleTypes = moduleTypes.filter((mt) => mt.is_active);
   const selectedModule = moduleTypes.find(
-    (mt) => value.asset_type === "slot_module" && mt.code === value.module_type,
+    (mt) => value.category === "slot_module" && mt.code === value.module_type,
   );
 
   return (
@@ -744,12 +744,12 @@ function EntryEditor({
         />
       </label>
       <label>
-        Asset Type
+        Category
         <select
-          value={value.asset_type}
+          value={value.category}
           disabled={disabled}
           onChange={(event) =>
-            onAssetTypeChange(event.target.value as AssetType)
+            onCategoryChange(event.target.value as AssetCategory)
           }
         >
           <option value="plate">Plate</option>
@@ -777,7 +777,7 @@ function EntryEditor({
         </select>
       </label>
 
-      {value.asset_type === "hardware" && (
+      {value.category === "hardware" && (
         <label>
           Hardware Type
           <select
@@ -792,7 +792,7 @@ function EntryEditor({
         </label>
       )}
 
-      {value.asset_type === "slot_module" && (
+      {value.category === "slot_module" && (
         <>
           <label>
             Slot Position
@@ -846,13 +846,17 @@ function EntryEditor({
       )}
 
       <label>
-        GLB File Path
+        GLB File
         <input
           type="text"
           value={value.file}
+          placeholder="example.glb"
           disabled={disabled}
           onChange={(event) =>
-            onValueChange({ ...value, file: event.target.value })
+            onValueChange({
+              ...value,
+              file: event.target.value,
+            })
           }
         />
       </label>

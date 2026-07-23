@@ -338,7 +338,7 @@ Current:
 
 ```json
 {
-  "asset_type": "plate",
+  "category": "plate",
   "file": "/assets/glb/1gang_plate.glb",
   "coordinate_space": "assembly_origin",
   "material_policy": "replace_all"
@@ -349,7 +349,7 @@ Target:
 
 ```json
 {
-  "asset_type": "plate",
+  "category": "plate",
   "file": "/assets/glb/1gang_plate.glb",
   "coordinate_space": "assembly_origin"
 }
@@ -359,7 +359,7 @@ The manifest should contain only asset-registration information, such as:
 
 ```text
 asset key
-asset type
+category
 file path
 coordinate space
 module type

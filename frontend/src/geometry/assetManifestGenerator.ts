@@ -53,7 +53,7 @@ export function previewBulkGeneration(
   for (const gang of options.gangCounts) {
     if (options.generatePlates) {
       const value: AssetManifestEntry = {
-        asset_type: "plate",
+        category: "plate",
         gang_count: gang,
         file: "",
         is_active: options.activateGenerated,
@@ -66,7 +66,7 @@ export function previewBulkGeneration(
     }
     if (options.generatePlateScrews) {
       const value: AssetManifestEntry = {
-        asset_type: "hardware",
+        category: "hardware",
         hardware_type: "plate_screws",
         gang_count: gang,
         file: "",
@@ -82,7 +82,7 @@ export function previewBulkGeneration(
       for (let slot = 1; slot <= gang; slot += 1) {
         for (const moduleType of options.moduleTypeCodes) {
           const value: AssetManifestEntry = {
-            asset_type: "slot_module",
+            category: "slot_module",
             gang_count: gang,
             module_type: moduleType,
             slot_position: slot,

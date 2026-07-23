@@ -46,16 +46,19 @@ def test_migrate_legacy_manifest():
     migrated = svc.migrate_manifest(LEGACY_MANIFEST)
     assert "schema_version" not in migrated
     plate = migrated["plate.1gang"]
-    assert plate["asset_type"] == "plate"
+    # Legacy ``asset_type`` is migrated to ``category`` on load.
+    assert plate["category"] == "plate"
+    assert "asset_type" not in plate
     assert plate["gang_count"] == 1
-    assert plate["file"] == "/assets/wall_plates/1gang_plate.glb"
+    # ``file`` is reduced to a bare name; the folder lives in properties.
+    assert plate["file"] == "1gang_plate.glb"
     assert plate["is_active"] is True
     assert "coordinate_space" not in plate
 
     screws = migrated["hardware.1gang.plate_screws"]
     assert screws["hardware_type"] == "plate_screws"
     assert screws["gang_count"] == 1
-    assert screws["file"] == "/assets/wall_plates/1gang_plate_screws.glb"
+    assert screws["file"] == "1gang_plate_screws.glb"
 
     dimmer = migrated["module.1gang.slot01.dimmer"]
     assert dimmer["module_type"] == "dimmer"
@@ -69,6 +72,8 @@ def test_serialize_uses_parts_key():
     data = json.loads(text)
     assert "parts" in data
     assert "assets" not in data
+    assert data["properties"]["glb_folder"] == "/assets/wall_plates/"
+    assert data["parts"]["plate.1gang"]["file"] == "1gang_plate.glb"
 
 
 def test_validate_valid_entries(client):
@@ -86,11 +91,11 @@ def test_validate_valid_entries(client):
 def test_validate_invalid_slot(client):
     parts = {
         "module.2gang.slot03.switch": {
-            "asset_type": "slot_module",
+            "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 3,
-            "file": "/assets/wall_plates/2gang_slot03_switch.glb",
+            "file": "2gang_slot03_switch.glb",
             "is_active": True,
         }
     }
@@ -107,19 +112,19 @@ def test_validate_invalid_slot(client):
 def test_validate_duplicate_active_resolver(client):
     parts = {
         "module.2gang.slot01.switch": {
-            "asset_type": "slot_module",
+            "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "/assets/wall_plates/2gang_slot01_switch.glb",
+            "file": "2gang_slot01_switch.glb",
             "is_active": True,
         },
         "module.2gang.slot01.switch.alt": {
-            "asset_type": "slot_module",
+            "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "/assets/wall_plates/2gang_slot01_switch_alt.glb",
+            "file": "2gang_slot01_switch_alt.glb",
             "is_active": True,
         },
     }
@@ -135,19 +140,19 @@ def test_validate_duplicate_active_resolver(client):
 def test_inactive_duplicate_is_warning_only(client):
     parts = {
         "module.2gang.slot01.switch": {
-            "asset_type": "slot_module",
+            "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "/assets/wall_plates/2gang_slot01_switch.glb",
+            "file": "2gang_slot01_switch.glb",
             "is_active": True,
         },
         "module.2gang.slot01.switch.alt": {
-            "asset_type": "slot_module",
+            "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "/assets/wall_plates/2gang_slot01_switch_alt.glb",
+            "file": "2gang_slot01_switch_alt.glb",
             "is_active": False,
         },
     }
@@ -167,7 +172,8 @@ def test_get_manifest_reads_new_location(client):
     assert "revision" in body
     parts = body["manifest"]["parts"]
     assert "plate.1gang" in parts
-    assert parts["plate.1gang"]["file"].startswith("/assets/wall_plates/")
+    assert parts["plate.1gang"]["file"] == "1gang_plate.glb"
+    assert body["manifest"]["properties"]["glb_folder"] == "/assets/wall_plates/"
     assert "coordinate_space" not in parts["plate.1gang"]
     assert "schema_version" not in body["manifest"]
     assert "assets" not in body["manifest"]
@@ -191,9 +197,9 @@ def test_put_saves_atomically_and_formats(client, isolated_manifest: Path):
     revision = get_response.json()["revision"]
     parts = get_response.json()["manifest"]["parts"]
     parts["plate.2gang"] = {
-        "asset_type": "plate",
+        "category": "plate",
         "gang_count": 2,
-        "file": "/assets/wall_plates/2gang_plate.glb",
+        "file": "2gang_plate.glb",
         "is_active": True,
     }
 
@@ -212,13 +218,12 @@ def test_put_saves_atomically_and_formats(client, isolated_manifest: Path):
     on_disk = json.loads(isolated_manifest.read_text(encoding="utf-8"))
     assert "schema_version" not in on_disk
     assert "assets" not in on_disk
-    assert on_disk["parts"]["plate.2gang"]["file"] == (
-        "/assets/wall_plates/2gang_plate.glb"
-    )
+    assert on_disk["properties"]["glb_folder"] == "/assets/wall_plates/"
+    assert on_disk["parts"]["plate.2gang"]["file"] == "2gang_plate.glb"
     # Deterministic formatting: trailing newline, 2-space indent.
     text = isolated_manifest.read_text(encoding="utf-8")
     assert text.endswith("\n")
-    assert '"asset_type": "plate"' in text
+    assert '"category": "plate"' in text
 
 
 def test_put_revision_conflict(client, isolated_manifest: Path):
@@ -240,15 +245,15 @@ def test_put_rejects_resolver_conflicts(client, isolated_manifest: Path):
     revision = get_response.json()["revision"]
     parts = {
         "plate.1gang": {
-            "asset_type": "plate",
+            "category": "plate",
             "gang_count": 1,
-            "file": "/assets/wall_plates/1gang_plate.glb",
+            "file": "1gang_plate.glb",
             "is_active": True,
         },
         "plate.1gang.alt": {
-            "asset_type": "plate",
+            "category": "plate",
             "gang_count": 1,
-            "file": "/assets/wall_plates/1gang_plate_alt.glb",
+            "file": "1gang_plate_alt.glb",
             "is_active": True,
         },
     }

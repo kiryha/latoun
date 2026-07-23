@@ -1,5 +1,36 @@
 # Latoun Asset Manifest Editor — Coding Agent Brief
 
+> **Update (v0.2) — manifest shape.** The manifest now has two root keys:
+> `properties` (shared data) and `parts` (the entry map). The GLB folder is
+> stored **once** as `properties.glb_folder` (a relative public URL prefix,
+> e.g. `/assets/wall_plates/`), and each entry's `file` holds only the **bare
+> file name** (e.g. `1gang_plate.glb`). The backend joins
+> `glb_folder + file` into the full public URL when resolving render state, so
+> anything downstream (viewport/assembly) still sees a full URL. The
+> `frontend/public` filesystem base is **not** stored in the manifest — it is a
+> backend constant (`settings.repository_root / "frontend" / "public"`) derived
+> at runtime, so the repo stays portable (no absolute machine paths anywhere).
+> Legacy manifests that stored a full path in `file` migrate automatically:
+> `file` is reduced to its basename on load. Older inline examples below that
+> show a full path inside `file` predate v0.2; read them as `glb_folder` +
+> basename.
+>
+> Current shape:
+>
+> ```json
+> {
+>   "properties": { "glb_folder": "/assets/wall_plates/" },
+>   "parts": {
+>     "plate.1gang": {
+>       "category": "plate",
+>       "gang_count": 1,
+>       "file": "1gang_plate.glb",
+>       "is_active": true
+>     }
+>   }
+> }
+> ```
+
 ## 1. Objective
 
 Add a new **Geometry** tab to the Latoun configurator for managing the wall-plate GLB asset manifest without editing JSON manually in an IDE.
@@ -61,7 +92,7 @@ Before implementation:
 /assets/glb/
 schema_version
 coordinate_space
-asset_type
+category
 slot_module
 plate_screws
 ```
@@ -156,24 +187,24 @@ The current manifest is:
   "schema_version": 2,
   "assets": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "file": "/assets/glb/1gang_plate.glb",
       "coordinate_space": "assembly_origin"
     },
     "hardware.1gang.plate_screws": {
-      "asset_type": "hardware",
+      "category": "hardware",
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.dimmer": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.switch": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_switch.glb",
@@ -414,9 +445,9 @@ Slot Module
 
 For the current wall-plate product, `hardware` is used for the plate screw asset.
 
-Do not create an `asset_types` database table in this task.
+Do not create a `category` database table in this task.
 
-Do not treat the product family `wall_plates` as an asset type.
+Do not treat the product family `wall_plates` as a category.
 
 The relationship is:
 
@@ -429,6 +460,21 @@ asset categories:
 - slot_module
 ```
 
+> **Terminology note (field renamed).** The manifest field that records this
+> category was originally named `asset_type`. It is now named `category` to
+> avoid colliding with the notion of a product "asset" / product family. The
+> backend accepts the legacy `asset_type` key on load for backward
+> compatibility and rewrites it as `category` on the next save. There is no
+> product-family "asset" table, and there is no `asset_types` table — the
+> application assumes a single product (`wall_plates`).
+
+> **Two independent axes — do not conflate them.** `category`
+> (`plate` / `hardware` / `slot_module`) describes *what kind of part* an entry
+> is. `module_type` (`switch` / `dimmer` / `outlet` / `usb_c_outlet`, from the
+> database) only sub-types a `slot_module`. A **plate is a category, not a
+> module type** — never add `plate` to the `module_types` table, because module
+> types are slot devices and a plate is the substrate that holds the slots.
+
 ---
 
 ## 11. Recommended Manifest Entry Shapes
@@ -437,7 +483,7 @@ asset categories:
 
 ```json
 "plate.1gang": {
-  "asset_type": "plate",
+  "category": "plate",
   "gang_count": 1,
   "file": "/assets/wall_plates/1gang_plate.glb",
   "is_active": true
@@ -448,7 +494,7 @@ asset categories:
 
 ```json
 "hardware.1gang.plate_screws": {
-  "asset_type": "hardware",
+  "category": "hardware",
   "hardware_type": "plate_screws",
   "gang_count": 1,
   "file": "/assets/wall_plates/1gang_plate_screws.glb",
@@ -460,7 +506,7 @@ asset categories:
 
 ```json
 "module.1gang.slot01.switch": {
-  "asset_type": "slot_module",
+  "category": "slot_module",
   "gang_count": 1,
   "module_type": "switch",
   "slot_position": 1,
@@ -558,6 +604,10 @@ The next save should normalize the entry and write the field explicitly.
 The Geometry editor must not hard-code module type strings.
 
 Load module types from the existing SQLite `module_types` table.
+
+> `module_types` holds only slot devices. Do not add `plate` (or `hardware`)
+> as a module type: those are `category` values, a separate axis from
+> `module_type`.
 
 Current records include:
 
@@ -684,7 +734,7 @@ Recommended columns:
 |---|---|
 | Active | Enabled or disabled state |
 | Manifest Key | Unique JSON object key |
-| Asset Type | Plate, Hardware, or Slot Module |
+| Category | Plate, Hardware, or Slot Module |
 | Gang | 1–4 |
 | Slot | Slot number for module assets |
 | Module Type | Database-backed module type |
@@ -706,7 +756,7 @@ The table should support:
 Recommended filters:
 
 ```text
-Asset Type
+Category
 Gang Count
 Module Type
 Active / Inactive
@@ -733,19 +783,19 @@ Common fields:
 
 ```text
 Manifest Key
-Asset Type
+Category
 Gang Count
 GLB File Path
 Active
 ```
 
-Conditional fields depend on `asset_type`.
+Conditional fields depend on `category`.
 
 ### Plate fields
 
 ```text
 Manifest Key
-Asset Type = Plate
+Category = Plate
 Gang Count
 GLB File Path
 Active
@@ -763,7 +813,7 @@ Hardware Type
 
 ```text
 Manifest Key
-Asset Type = Hardware
+Category = Hardware
 Hardware Type
 Gang Count
 GLB File Path
@@ -788,7 +838,7 @@ This can be a fixed dropdown rather than free text.
 
 ```text
 Manifest Key
-Asset Type = Slot Module
+Category = Slot Module
 Gang Count
 Slot Position
 Module Type
@@ -895,7 +945,7 @@ Provide:
 Add Entry
 ```
 
-The user chooses an asset type:
+The user chooses a category:
 
 ```text
 Plate
@@ -909,7 +959,7 @@ Create a draft entry with sensible defaults.
 
 ```json
 {
-  "asset_type": "plate",
+  "category": "plate",
   "gang_count": 1,
   "file": "/assets/wall_plates/",
   "is_active": true
@@ -920,7 +970,7 @@ Create a draft entry with sensible defaults.
 
 ```json
 {
-  "asset_type": "hardware",
+  "category": "hardware",
   "hardware_type": "plate_screws",
   "gang_count": 1,
   "file": "/assets/wall_plates/",
@@ -932,7 +982,7 @@ Create a draft entry with sensible defaults.
 
 ```json
 {
-  "asset_type": "slot_module",
+  "category": "slot_module",
   "gang_count": 1,
   "module_type": "switch",
   "slot_position": 1,
@@ -957,7 +1007,7 @@ Clearly mark edited rows.
 
 The user should be able to move between rows without losing unsaved changes.
 
-Changing `asset_type` must:
+Changing `category` must:
 
 - update visible fields;
 - remove fields that are not valid for the new type;
@@ -1013,7 +1063,7 @@ or opens immediately with the key field requiring correction.
 The duplicate should preserve:
 
 ```text
-asset_type
+category
 gang_count
 slot_position
 module_type
@@ -1272,7 +1322,7 @@ The manifest must not contain two active entries that resolve to the same assemb
 ### Plate resolver identity
 
 ```text
-asset_type = plate
+category = plate
 gang_count
 ```
 
@@ -1281,7 +1331,7 @@ Only one active plate entry may exist for each gang count.
 ### Hardware resolver identity
 
 ```text
-asset_type = hardware
+category = hardware
 hardware_type
 gang_count
 ```
@@ -1291,7 +1341,7 @@ Only one active plate-screw entry may exist for each gang count.
 ### Slot-module resolver identity
 
 ```text
-asset_type = slot_module
+category = slot_module
 gang_count
 slot_position
 module_type
@@ -1629,7 +1679,7 @@ Preferred field order:
 ### Plate
 
 ```text
-asset_type
+category
 gang_count
 file
 is_active
@@ -1638,7 +1688,7 @@ is_active
 ### Hardware
 
 ```text
-asset_type
+category
 hardware_type
 gang_count
 file
@@ -1648,7 +1698,7 @@ is_active
 ### Slot module
 
 ```text
-asset_type
+category
 gang_count
 module_type
 slot_position
@@ -1736,7 +1786,7 @@ Avoid creating one API endpoint per manifest entry because saving is intentional
 {
   "assets": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "gang_count": 1,
       "file": "/assets/wall_plates/1gang_plate.glb",
       "is_active": true
@@ -1811,7 +1861,7 @@ Create typed frontend and backend models.
 Suggested TypeScript:
 
 ```typescript
-type AssetType = "plate" | "hardware" | "slot_module";
+type AssetCategory = "plate" | "hardware" | "slot_module";
 
 type GangCount = 1 | 2 | 3 | 4;
 
@@ -1820,23 +1870,23 @@ interface AssetManifest {
 }
 
 interface AssetManifestEntryBase {
-  asset_type: AssetType;
+  category: AssetCategory;
   gang_count: GangCount;
   file: string;
   is_active: boolean;
 }
 
 interface PlateManifestEntry extends AssetManifestEntryBase {
-  asset_type: "plate";
+  category: "plate";
 }
 
 interface HardwareManifestEntry extends AssetManifestEntryBase {
-  asset_type: "hardware";
+  category: "hardware";
   hardware_type: "plate_screws";
 }
 
 interface SlotModuleManifestEntry extends AssetManifestEntryBase {
-  asset_type: "slot_module";
+  category: "slot_module";
   module_type: string;
   slot_position: number;
 }
@@ -1887,10 +1937,10 @@ manifest key contains no unsupported control characters
 ### Common entry validation
 
 ```text
-asset_type is recognized
+category is recognized
 gang_count is 1, 2, 3, or 4
 file is non-empty
-file starts with /assets/wall_plates/
+file is a bare name (no "/" or "\" folder separators)  # folder lives in properties.glb_folder
 file ends with .glb
 is_active is boolean
 ```
@@ -1898,7 +1948,7 @@ is_active is boolean
 ### Plate validation
 
 ```text
-asset_type = plate
+category = plate
 hardware_type must not exist
 module_type must not exist
 slot_position must not exist
@@ -1907,7 +1957,7 @@ slot_position must not exist
 ### Hardware validation
 
 ```text
-asset_type = hardware
+category = hardware
 hardware_type = plate_screws
 module_type must not exist
 slot_position must not exist
@@ -1916,7 +1966,7 @@ slot_position must not exist
 ### Slot-module validation
 
 ```text
-asset_type = slot_module
+category = slot_module
 module_type is required
 module_type exists in module_types table
 slot_position is required
@@ -1946,7 +1996,7 @@ Gang count must be between 1 and 4.
 Slot 3 is invalid for a 2-gang asset.
 Module type "toggle" does not exist in the database.
 Two active entries resolve to 2-gang slot 1 Switch.
-File path must begin with /assets/wall_plates/.
+File must be a bare name (no folders); the folder is set once in properties.glb_folder.
 ```
 
 ### Non-blocking warnings
@@ -2014,7 +2064,7 @@ is_active
 
 ```text
 manifest keys
-asset_type
+category
 module_type
 slot_position
 file basename
@@ -2024,34 +2074,37 @@ Example migrated manifest:
 
 ```json
 {
-  "assets": {
+  "properties": {
+    "glb_folder": "/assets/wall_plates/"
+  },
+  "parts": {
     "plate.1gang": {
-      "asset_type": "plate",
+      "category": "plate",
       "gang_count": 1,
-      "file": "/assets/wall_plates/1gang_plate.glb",
+      "file": "1gang_plate.glb",
       "is_active": true
     },
     "hardware.1gang.plate_screws": {
-      "asset_type": "hardware",
+      "category": "hardware",
       "hardware_type": "plate_screws",
       "gang_count": 1,
-      "file": "/assets/wall_plates/1gang_plate_screws.glb",
+      "file": "1gang_plate_screws.glb",
       "is_active": true
     },
     "module.1gang.slot01.dimmer": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "gang_count": 1,
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "/assets/wall_plates/1gang_slot01_dimmer.glb",
+      "file": "1gang_slot01_dimmer.glb",
       "is_active": true
     },
     "module.1gang.slot01.switch": {
-      "asset_type": "slot_module",
+      "category": "slot_module",
       "gang_count": 1,
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/wall_plates/1gang_slot01_switch.glb",
+      "file": "1gang_slot01_switch.glb",
       "is_active": true
     }
   }
@@ -2071,7 +2124,7 @@ The Assembly resolver must support:
 ### Plate lookup
 
 ```text
-asset_type = plate
+category = plate
 gang_count = selected gang count
 is_active = true
 ```
@@ -2079,7 +2132,7 @@ is_active = true
 ### Plate-screw lookup
 
 ```text
-asset_type = hardware
+category = hardware
 hardware_type = plate_screws
 gang_count = selected gang count
 is_active = true
@@ -2088,7 +2141,7 @@ is_active = true
 ### Slot-module lookup
 
 ```text
-asset_type = slot_module
+category = slot_module
 gang_count = selected gang count
 slot_position = selected slot
 module_type = selected module code
@@ -2360,7 +2413,7 @@ Add tests for:
 valid plate entry
 valid hardware entry
 valid slot-module entry
-invalid asset type
+invalid category
 invalid gang count
 invalid slot number
 slot greater than gang count

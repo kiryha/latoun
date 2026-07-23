@@ -105,7 +105,7 @@ def _resolve_geometry(
     missing: list[MissingAssetWarning] = []
 
     plate_fallback_key = f"plate.{gang_count}gang"
-    plate_match = manifest.find_active(asset_type="plate", gang_count=gang_count)
+    plate_match = manifest.find_active(category="plate", gang_count=gang_count)
     if plate_match is None:
         missing.append(
             MissingAssetWarning(
@@ -120,14 +120,14 @@ def _resolve_geometry(
         assets.append(
             ResolvedAsset(
                 asset_key=plate_key,
-                file=plate_entry["file"],
+                file=manifest.url_for_entry(plate_entry),
                 role="plate",
             )
         )
 
     screws_fallback_key = f"hardware.{gang_count}gang.plate_screws"
     screws_match = manifest.find_active(
-        asset_type="hardware",
+        category="hardware",
         gang_count=gang_count,
         hardware_type="plate_screws",
     )
@@ -145,7 +145,7 @@ def _resolve_geometry(
         assets.append(
             ResolvedAsset(
                 asset_key=screws_key,
-                file=screws_entry["file"],
+                file=manifest.url_for_entry(screws_entry),
                 role="plate_screws",
             )
         )
@@ -153,7 +153,7 @@ def _resolve_geometry(
     for slot_number, module_type_code in normalized:
         fallback_key = _module_asset_key(gang_count, slot_number, module_type_code)
         match = manifest.find_active(
-            asset_type="slot_module",
+            category="slot_module",
             gang_count=gang_count,
             slot_position=slot_number,
             module_type=module_type_code,
@@ -178,7 +178,7 @@ def _resolve_geometry(
         assets.append(
             ResolvedAsset(
                 asset_key=asset_key,
-                file=entry["file"],
+                file=manifest.url_for_entry(entry),
                 role="module",
                 slot_number=slot_number,
                 module_type=module_type_code,

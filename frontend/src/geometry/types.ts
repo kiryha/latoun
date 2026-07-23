@@ -1,6 +1,6 @@
 // Wall-plate asset manifest types for the Geometry tab.
 
-export type AssetType = "plate" | "hardware" | "slot_module";
+export type AssetCategory = "plate" | "hardware" | "slot_module";
 
 export type GangCount = 1 | 2 | 3 | 4;
 
@@ -9,14 +9,14 @@ export type HardwareType = "plate_screws";
 export type EntryEditState = "unchanged" | "added" | "modified" | "deleted";
 
 export interface PlateManifestEntry {
-  asset_type: "plate";
+  category: "plate";
   gang_count: GangCount;
   file: string;
   is_active: boolean;
 }
 
 export interface HardwareManifestEntry {
-  asset_type: "hardware";
+  category: "hardware";
   hardware_type: HardwareType;
   gang_count: GangCount;
   file: string;
@@ -24,7 +24,7 @@ export interface HardwareManifestEntry {
 }
 
 export interface SlotModuleManifestEntry {
-  asset_type: "slot_module";
+  category: "slot_module";
   gang_count: GangCount;
   module_type: string;
   slot_position: number;
@@ -37,7 +37,13 @@ export type AssetManifestEntry =
   | HardwareManifestEntry
   | SlotModuleManifestEntry;
 
+export interface AssetManifestProperties {
+  /** Public URL prefix (relative) that each entry's bare `file` resolves against. */
+  glb_folder: string;
+}
+
 export interface AssetManifest {
+  properties: AssetManifestProperties;
   parts: Record<string, AssetManifestEntry>;
 }
 
@@ -84,9 +90,12 @@ export interface ModuleTypeOption {
   sort_order: number;
 }
 
-export const WALL_PLATES_PREFIX = "/assets/wall_plates/";
+/** Default public URL folder for GLBs (overridable via manifest properties.glb_folder). */
+export const DEFAULT_GLB_FOLDER = "/assets/wall_plates/";
+/** Back-compat alias. */
+export const WALL_PLATES_PREFIX = DEFAULT_GLB_FOLDER;
 export const GANG_COUNTS: GangCount[] = [1, 2, 3, 4];
-export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+export const CATEGORY_LABELS: Record<AssetCategory, string> = {
   plate: "Plate",
   hardware: "Hardware",
   slot_module: "Slot Module",

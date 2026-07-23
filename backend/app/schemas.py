@@ -176,7 +176,17 @@ class ModuleTypeOut(BaseModel):
 # --------------------------------------------------------------------------- #
 # Wall-plate asset manifest (Geometry tab)
 # --------------------------------------------------------------------------- #
+class AssetManifestProperties(BaseModel):
+    """Shared manifest-level data. ``glb_folder`` is the public URL prefix
+    (relative) that every entry's bare ``file`` name is resolved against."""
+
+    glb_folder: str = "/assets/wall_plates/"
+
+
 class AssetManifestDocument(BaseModel):
+    properties: AssetManifestProperties = Field(
+        default_factory=AssetManifestProperties
+    )
     parts: dict[str, dict]
 
 
