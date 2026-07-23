@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Banner } from "../components/Banner";
 import {
   type BulkGenerateOptions,
 } from "./assetManifestGenerator";
 import { entryStatusLabel } from "./assetManifestValidation";
-import { GeometryPreview } from "./GeometryPreview";
+import {
+  GeometryPreview,
+  SemanticMaterialsPanel,
+  type PreviewMetadata,
+} from "./GeometryPreview";
 import {
   ASSET_TYPE_LABELS,
   GANG_COUNTS,
@@ -174,46 +178,15 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
   };
 
   const selected = editor.selected;
+  const [previewMetadata, setPreviewMetadata] = useState<PreviewMetadata | null>(
+    null,
+  );
+  const handlePreviewMetadata = useCallback((meta: PreviewMetadata | null) => {
+    setPreviewMetadata(meta);
+  }, []);
 
   return (
     <div className="geometry-manager">
-      <header className="geometry-toolbar">
-        <div>
-          <h2>Geometry Manifest</h2>
-          <p className="geometry-dirty">
-            {editor.isDirty
-              ? `Unsaved changes: ${editor.dirtyCount}`
-              : "No unsaved changes"}
-          </p>
-        </div>
-        <div className="geometry-toolbar-actions">
-          <button
-            type="button"
-            className="button small"
-            onClick={openGenerator}
-            disabled={!!editor.loadError}
-          >
-            Generate Wall-Plate Entries
-          </button>
-          <button
-            type="button"
-            className="button small"
-            onClick={handleDiscard}
-            disabled={!editor.isDirty || editor.saving}
-          >
-            Discard Changes
-          </button>
-          <button
-            type="button"
-            className="button primary"
-            onClick={() => void editor.save()}
-            disabled={!editor.isDirty || editor.saving || !!editor.loadError}
-          >
-            {editor.saving ? "Saving…" : "Save Manifest"}
-          </button>
-        </div>
-      </header>
-
       {editor.loadError && (
         <Banner kind="error">
           {editor.loadError}{" "}
@@ -230,91 +203,116 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
         </Banner>
       )}
 
-      <div className="geometry-filters">
-        <label>
-          Search
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Key, file, module…"
-          />
-        </label>
-        <label>
-          Asset Type
-          <select
-            value={filterType}
-            onChange={(event) =>
-              setFilterType(event.target.value as AssetType | "all")
-            }
-          >
-            <option value="all">All</option>
-            <option value="plate">Plate</option>
-            <option value="hardware">Hardware</option>
-            <option value="slot_module">Slot Module</option>
-          </select>
-        </label>
-        <label>
-          Gang
-          <select
-            value={filterGang === "all" ? "all" : String(filterGang)}
-            onChange={(event) => {
-              const value = event.target.value;
-              setFilterGang(value === "all" ? "all" : (Number(value) as GangCount));
-            }}
-          >
-            <option value="all">All</option>
-            {GANG_COUNTS.map((gang) => (
-              <option key={gang} value={gang}>
-                {gang} Gang
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Active
-          <select
-            value={filterActive}
-            onChange={(event) =>
-              setFilterActive(event.target.value as typeof filterActive)
-            }
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </label>
-        <div className="geometry-add">
-          <button
-            type="button"
-            className="button small"
-            onClick={() => setAddMenuOpen((open) => !open)}
-            disabled={!!editor.loadError}
-          >
-            Add Entry
-          </button>
-          {addMenuOpen && (
-            <div className="geometry-add-menu" role="menu">
-              {(["plate", "hardware", "slot_module"] as AssetType[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    editor.addEntry(type);
-                    setAddMenuOpen(false);
-                  }}
-                >
-                  {ASSET_TYPE_LABELS[type]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="geometry-body">
         <section className="geometry-table-panel" aria-label="Manifest entries">
+          <div className="geometry-filters">
+            <div className="geometry-toolbar-actions">
+              <div className="geometry-add">
+                <button
+                  type="button"
+                  className="button small"
+                  onClick={() => setAddMenuOpen((open) => !open)}
+                  disabled={!!editor.loadError}
+                >
+                  Add Entry
+                </button>
+                {addMenuOpen && (
+                  <div className="geometry-add-menu" role="menu">
+                    {(["plate", "hardware", "slot_module"] as AssetType[]).map(
+                      (type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            editor.addEntry(type);
+                            setAddMenuOpen(false);
+                          }}
+                        >
+                          {ASSET_TYPE_LABELS[type]}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="button small"
+                onClick={openGenerator}
+                disabled={!!editor.loadError}
+              >
+                Add Entries
+              </button>
+              <button
+                type="button"
+                className="button small"
+                onClick={handleDiscard}
+                disabled={!editor.isDirty || editor.saving}
+              >
+                Discard Changes
+              </button>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => void editor.save()}
+                disabled={!editor.isDirty || editor.saving || !!editor.loadError}
+              >
+                {editor.saving ? "Saving…" : "Save Manifest"}
+              </button>
+            </div>
+
+            <div className="geometry-filter-fields">
+              <input
+                type="search"
+                aria-label="Search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search"
+              />
+              <select
+                aria-label="Asset type"
+                value={filterType}
+                onChange={(event) =>
+                  setFilterType(event.target.value as AssetType | "all")
+                }
+              >
+                <option value="all">ASSET TYPE</option>
+                <option value="plate">Plate</option>
+                <option value="hardware">Hardware</option>
+                <option value="slot_module">Slot Module</option>
+              </select>
+              <select
+                aria-label="Gang"
+                value={filterGang === "all" ? "all" : String(filterGang)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setFilterGang(
+                    value === "all" ? "all" : (Number(value) as GangCount),
+                  );
+                }}
+              >
+                <option value="all">GANG</option>
+                {GANG_COUNTS.map((gang) => (
+                  <option key={gang} value={gang}>
+                    {gang} Gang
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Active"
+                value={filterActive}
+                onChange={(event) =>
+                  setFilterActive(event.target.value as typeof filterActive)
+                }
+              >
+                <option value="all">ACTIVE</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
           {editor.loading ? (
             <p className="muted">Loading manifest…</p>
           ) : (
@@ -401,7 +399,10 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                         <td>
                           <code>{row.manifestKey || "(empty)"}</code>
                           {row.editState !== "unchanged" && (
-                            <em className="geometry-row-flag"> · {row.editState}</em>
+                            <em className="geometry-row-flag">
+                              {" "}
+                              · {row.editState}
+                            </em>
                           )}
                         </td>
                         <td>{ASSET_TYPE_LABELS[row.value.asset_type]}</td>
@@ -425,7 +426,10 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
                               ? hardwareLabel(row.value.hardware_type)
                               : "—"}
                         </td>
-                        <td className="geometry-file-cell" title={row.value.file}>
+                        <td
+                          className="geometry-file-cell"
+                          title={row.value.file}
+                        >
                           <code>{row.value.file}</code>
                         </td>
                         <td>{status}</td>
@@ -459,28 +463,50 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
               </table>
             </div>
           )}
-        </section>
 
-        <aside className="geometry-side">
-          <section className="geometry-editor" aria-label="Selected entry editor">
-            <h3>Entry Editor</h3>
-            {!selected ? (
-              <p className="muted">Select an entry to edit.</p>
+          <section className="geometry-validation" aria-label="Validation">
+            <h3>Validation</h3>
+            {editor.validation.errors.length === 0 &&
+            editor.validation.warnings.length === 0 ? (
+              <p className="muted">No issues.</p>
             ) : (
-              <EntryEditor
-                row={selected}
-                moduleTypes={editor.moduleTypes}
-                moduleTypesError={editor.moduleTypesError}
-                onKeyChange={(key) => editor.setManifestKey(selected.clientId, key)}
-                onAssetTypeChange={(type) =>
-                  editor.changeAssetType(selected.clientId, type)
-                }
-                onValueChange={(value) =>
-                  editor.setEntryValue(selected.clientId, value)
-                }
-              />
+              <div className="geometry-validation-lists">
+                {editor.validation.errors.length > 0 && (
+                  <div>
+                    <h4>Errors</h4>
+                    <ul>
+                      {editor.validation.errors.map((issue, index) => (
+                        <li key={`e-${index}`}>
+                          {issue.assetKey ? (
+                            <strong>{issue.assetKey}: </strong>
+                          ) : null}
+                          {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {editor.validation.warnings.length > 0 && (
+                  <div>
+                    <h4>Warnings</h4>
+                    <ul>
+                      {editor.validation.warnings.map((issue, index) => (
+                        <li key={`w-${index}`}>
+                          {issue.assetKey ? (
+                            <strong>{issue.assetKey}: </strong>
+                          ) : null}
+                          {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
           </section>
+        </section>
+
+        <aside className="geometry-side" aria-label="Entry editor">
           <GeometryPreview
             filePath={
               selected && selected.editState !== "deleted"
@@ -490,50 +516,41 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
             missingFile={
               !!selected && editor.missingFiles.has(selected.value.file)
             }
+            onMetadata={handlePreviewMetadata}
           />
+          <div className="geometry-side-scroll">
+            <section className="geometry-editor">
+              <h3>Scene Data</h3>
+              {!selected ? (
+                <p className="muted">Select an entry to edit.</p>
+              ) : (
+                <EntryEditor
+                  row={selected}
+                  moduleTypes={editor.moduleTypes}
+                  moduleTypesError={editor.moduleTypesError}
+                  onKeyChange={(key) =>
+                    editor.setManifestKey(selected.clientId, key)
+                  }
+                  onAssetTypeChange={(type) =>
+                    editor.changeAssetType(selected.clientId, type)
+                  }
+                  onValueChange={(value) =>
+                    editor.setEntryValue(selected.clientId, value)
+                  }
+                />
+              )}
+            </section>
+            <SemanticMaterialsPanel
+              metadata={previewMetadata}
+              filePath={
+                selected && selected.editState !== "deleted"
+                  ? selected.value.file
+                  : null
+              }
+            />
+          </div>
         </aside>
       </div>
-
-      <section className="geometry-validation" aria-label="Validation">
-        <h3>Validation</h3>
-        {editor.validation.errors.length === 0 &&
-        editor.validation.warnings.length === 0 ? (
-          <p className="muted">No issues.</p>
-        ) : (
-          <div className="geometry-validation-lists">
-            {editor.validation.errors.length > 0 && (
-              <div>
-                <h4>Errors</h4>
-                <ul>
-                  {editor.validation.errors.map((issue, index) => (
-                    <li key={`e-${index}`}>
-                      {issue.assetKey ? (
-                        <strong>{issue.assetKey}: </strong>
-                      ) : null}
-                      {issue.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {editor.validation.warnings.length > 0 && (
-              <div>
-                <h4>Warnings</h4>
-                <ul>
-                  {editor.validation.warnings.map((issue, index) => (
-                    <li key={`w-${index}`}>
-                      {issue.assetKey ? (
-                        <strong>{issue.assetKey}: </strong>
-                      ) : null}
-                      {issue.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
 
       {showGenerator && generatorOptions && generatorPreview && (
         <div className="geometry-modal-backdrop" role="presentation">
@@ -838,17 +855,6 @@ function EntryEditor({
             onValueChange({ ...value, file: event.target.value })
           }
         />
-      </label>
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={value.is_active}
-          disabled={disabled}
-          onChange={(event) =>
-            onValueChange({ ...value, is_active: event.target.checked })
-          }
-        />
-        Active
       </label>
     </div>
   );

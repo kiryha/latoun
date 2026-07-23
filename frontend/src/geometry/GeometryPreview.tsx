@@ -15,15 +15,16 @@ import * as THREE from "three";
 import { HDRI_PATH } from "../three/Scene";
 import { collectBindingNames } from "../three/applySemanticMaterials";
 
-export interface SemanticMaterialRow {
-  meshName: string;
+export interface SceneObjectRow {
+  /** Stable unique id for React keys (Three.js uuid). */
+  objectId: string;
+  objectName: string;
+  objectType: string;
   materialNames: string[];
 }
 
 export interface PreviewMetadata {
-  objectCount: number;
-  meshCount: number;
-  semanticMaterials: SemanticMaterialRow[];
+  sceneObjects: SceneObjectRow[];
   bindings: string[];
   size: { x: number; y: number; z: number } | null;
 }
@@ -31,6 +32,7 @@ export interface PreviewMetadata {
 interface GeometryPreviewProps {
   filePath: string | null;
   missingFile?: boolean;
+  onMetadata?: (meta: PreviewMetadata | null) => void;
 }
 
 class PreviewErrorBoundary extends Component<
@@ -76,22 +78,31 @@ function PreviewModel({
   const cloned = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
-    let objectCount = 0;
-    let meshCount = 0;
-    const semanticMaterials: SemanticMaterialRow[] = [];
+    const sceneObjects: SceneObjectRow[] = [];
     cloned.traverse((object) => {
-      objectCount += 1;
+      // Skip the glTF Scene root group; list authored objects only.
+      if (object === cloned) return;
+
       const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      meshCount += 1;
-      const materials = Array.isArray(mesh.material)
-        ? mesh.material
-        : [mesh.material];
-      const materialNames = materials
-        .map((material) => material?.name?.trim())
-        .filter((name): name is string => !!name);
-      semanticMaterials.push({
-        meshName: mesh.name || "(unnamed mesh)",
+      const materialNames: string[] = [];
+      if (mesh.isMesh) {
+        const materials = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+        for (const [slotIndex, material] of materials.entries()) {
+          const name = material?.name?.trim();
+          // One row-cell entry per material slot so multi-material meshes
+          // surface every assignment.
+          materialNames.push(
+            name && name.length > 0 ? name : `(unnamed slot ${slotIndex})`,
+          );
+        }
+      }
+
+      sceneObjects.push({
+        objectId: object.uuid,
+        objectName: object.name?.trim() || `(unnamed ${object.type})`,
+        objectType: object.type,
         materialNames,
       });
     });
@@ -102,9 +113,7 @@ function PreviewModel({
     if (!empty) box.getSize(size);
 
     onMetadata({
-      objectCount,
-      meshCount,
-      semanticMaterials,
+      sceneObjects,
       bindings: collectBindingNames(cloned),
       size: empty ? null : { x: size.x, y: size.y, z: size.z },
     });
@@ -125,18 +134,19 @@ function PreviewFallback() {
   );
 }
 
+/** Viewport-only preview. Scene data / semantic materials live in the editor scroll. */
 export function GeometryPreview({
   filePath,
   missingFile = false,
+  onMetadata,
 }: GeometryPreviewProps) {
   const [showGrid, setShowGrid] = useState(true);
   const [showAxes, setShowAxes] = useState(true);
-  const [metadata, setMetadata] = useState<PreviewMetadata | null>(null);
   const resetKey = filePath ?? "";
 
   useEffect(() => {
-    setMetadata(null);
-  }, [filePath]);
+    onMetadata?.(null);
+  }, [filePath, onMetadata]);
 
   if (!filePath) {
     return (
@@ -202,7 +212,10 @@ export function GeometryPreview({
             <Suspense fallback={<PreviewFallback />}>
               <Environment files={HDRI_PATH} />
               <Bounds fit clip observe margin={1.35}>
-                <PreviewModel filePath={filePath} onMetadata={setMetadata} />
+                <PreviewModel
+                  filePath={filePath}
+                  onMetadata={(meta) => onMetadata?.(meta)}
+                />
               </Bounds>
               {showGrid && (
                 <Grid
@@ -218,77 +231,64 @@ export function GeometryPreview({
           </Canvas>
         </PreviewErrorBoundary>
       </div>
-      <div className="geometry-preview-meta">
-        <div className="geometry-preview-meta-block">
-          <h4>Preview</h4>
-          <dl>
-            <div>
-              <dt>File</dt>
-              <dd>
-                <code>{filePath}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>{metadata ? "GLB loaded" : "Loading GLB"}</dd>
-            </div>
-            {metadata && (
-              <>
-                <div>
-                  <dt>Objects</dt>
-                  <dd>{metadata.objectCount}</dd>
-                </div>
-                <div>
-                  <dt>Meshes</dt>
-                  <dd>{metadata.meshCount}</dd>
-                </div>
-                {metadata.size && (
-                  <div>
-                    <dt>Bounds</dt>
-                    <dd>
-                      {metadata.size.x.toFixed(3)} × {metadata.size.y.toFixed(3)} ×{" "}
-                      {metadata.size.z.toFixed(3)}
-                    </dd>
-                  </div>
-                )}
-              </>
-            )}
-          </dl>
-        </div>
-        <div className="geometry-preview-meta-block">
-          <h4>Semantic Materials</h4>
-          {!metadata ? (
-            <p className="muted">Waiting for GLB…</p>
-          ) : metadata.semanticMaterials.length === 0 ? (
-            <p className="muted">No semantic material names found.</p>
-          ) : (
-            <table className="geometry-semantic-table">
-              <thead>
-                <tr>
-                  <th scope="col">Mesh</th>
-                  <th scope="col">Semantic Material</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metadata.semanticMaterials.map((row) => (
-                  <tr key={`${row.meshName}-${row.materialNames.join(",")}`}>
-                    <td>
-                      <code>{row.meshName}</code>
-                    </td>
-                    <td>
-                      {row.materialNames.length === 0
-                        ? "—"
-                        : row.materialNames.map((name) => (
-                            <code key={name}>{name}</code>
-                          ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+    </div>
+  );
+}
+
+export function SemanticMaterialsPanel({
+  metadata,
+  filePath,
+}: {
+  metadata: PreviewMetadata | null;
+  filePath: string | null;
+}) {
+  return (
+    <div className="geometry-preview-meta-block">
+      <h4>Materials Assignment</h4>
+      {!filePath ? (
+        <p className="muted">Select an entry to inspect materials.</p>
+      ) : !metadata ? (
+        <p className="muted">Waiting for GLB…</p>
+      ) : metadata.sceneObjects.length === 0 ? (
+        <p className="muted">No scene objects found.</p>
+      ) : (
+        <table className="geometry-semantic-table">
+          <thead>
+            <tr>
+              <th scope="col">Object</th>
+              <th scope="col">Material</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metadata.sceneObjects.map((row) => (
+              <tr key={row.objectId}>
+                <td>
+                  <code>{row.objectName}</code>
+                  <span className="geometry-object-type">{row.objectType}</span>
+                </td>
+                <td>
+                  {row.materialNames.length === 0
+                    ? "—"
+                    : row.materialNames.map((name, index) => (
+                        <code key={`${row.objectId}-${index}`}>{name}</code>
+                      ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {metadata?.size && filePath && (
+        <dl className="geometry-preview-stats">
+          <div>
+            <dt>Scene Boundary</dt>
+            <dd>
+              {metadata.size.x.toFixed(3)} × {metadata.size.y.toFixed(3)} ×{" "}
+              {metadata.size.z.toFixed(3)}
+            </dd>
+          </div>
+        </dl>
+      )}
     </div>
   );
 }
