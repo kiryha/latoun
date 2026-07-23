@@ -4,9 +4,10 @@ Flow:
   1. Validate gang count and every slot module against the database.
   2. Resolve the ordered list of asset keys for the assembly.
   3. Look up each asset's GLB path in the manifest (geometry registry only).
+     Missing keys become asset warnings — they do not fail configuration.
   4. Resolve semantic material assignments by combining ``init`` with the
      selected finish scheme (single shared resolver).
-  5. Generate the prototype BOM.
+  5. Generate the prototype BOM from available assets only.
 
 Geometry is derived from gang count + per-slot modules. Finish schemes are
 independent and only affect material assignments.
@@ -21,6 +22,7 @@ from ..errors import ValidationError
 from ..models import ModuleType
 from ..schemas import (
     MaterialOut,
+    MissingAssetWarning,
     RenderStateOut,
     ResolvedAssembly,
     ResolvedAsset,
@@ -46,19 +48,6 @@ def _validate_module_type(session: Session, module_type_code: str) -> ModuleType
 
 def _module_asset_key(gang_count: int, slot_number: int, module_type_code: str) -> str:
     return f"module.{gang_count}gang.slot{slot_number:02d}.{module_type_code}"
-
-
-def _resolve_asset_keys(
-    gang_count: int, slot_modules: list[tuple[int, str]]
-) -> list[str]:
-    """Build plate + screws + one module asset key per occupied slot."""
-    keys = [
-        f"plate.{gang_count}gang",
-        f"hardware.{gang_count}gang.plate_screws",
-    ]
-    for slot_number, module_type_code in sorted(slot_modules, key=lambda item: item[0]):
-        keys.append(_module_asset_key(gang_count, slot_number, module_type_code))
-    return keys
 
 
 def _normalize_slot_modules(
@@ -94,6 +83,99 @@ def _normalize_slot_modules(
     return normalized
 
 
+def _describe_missing_module(
+    *,
+    gang_count: int,
+    slot_number: int,
+    module_type_code: str,
+) -> str:
+    readable = module_type_code.replace("_", " ")
+    return (
+        f"No GLB is registered for {gang_count}-gang slot {slot_number} "
+        f"{readable}."
+    )
+
+
+def _resolve_geometry(
+    gang_count: int, normalized: list[tuple[int, str]]
+) -> tuple[list[ResolvedAsset], list[MissingAssetWarning]]:
+    """Resolve plate, screws, and slot modules; soft-fail missing keys."""
+    manifest = get_asset_manifest()
+    assets: list[ResolvedAsset] = []
+    missing: list[MissingAssetWarning] = []
+
+    plate_key = f"plate.{gang_count}gang"
+    plate_entry = manifest.try_get(plate_key)
+    if plate_entry is None:
+        missing.append(
+            MissingAssetWarning(
+                asset_key=plate_key,
+                role="plate",
+                gang_count=gang_count,
+                message=f"No GLB is registered for {gang_count}-gang plate.",
+            )
+        )
+    else:
+        assets.append(
+            ResolvedAsset(
+                asset_key=plate_key,
+                file=plate_entry["file"],
+                role="plate",
+            )
+        )
+
+    screws_key = f"hardware.{gang_count}gang.plate_screws"
+    screws_entry = manifest.try_get(screws_key)
+    if screws_entry is None:
+        missing.append(
+            MissingAssetWarning(
+                asset_key=screws_key,
+                role="plate_screws",
+                gang_count=gang_count,
+                message=f"No GLB is registered for {gang_count}-gang plate screws.",
+            )
+        )
+    else:
+        assets.append(
+            ResolvedAsset(
+                asset_key=screws_key,
+                file=screws_entry["file"],
+                role="plate_screws",
+            )
+        )
+
+    for slot_number, module_type_code in normalized:
+        asset_key = _module_asset_key(gang_count, slot_number, module_type_code)
+        entry = manifest.try_get(asset_key)
+        if entry is None:
+            missing.append(
+                MissingAssetWarning(
+                    asset_key=asset_key,
+                    role="module",
+                    gang_count=gang_count,
+                    slot_number=slot_number,
+                    module_type=module_type_code,
+                    message=_describe_missing_module(
+                        gang_count=gang_count,
+                        slot_number=slot_number,
+                        module_type_code=module_type_code,
+                    ),
+                )
+            )
+            continue
+        assets.append(
+            ResolvedAsset(
+                asset_key=asset_key,
+                file=entry["file"],
+                role="module",
+                slot_number=slot_number,
+                module_type=module_type_code,
+            )
+        )
+
+    return assets, missing
+
+
 def resolve_render_state(
     session: Session,
     *,
@@ -107,6 +189,9 @@ def resolve_render_state(
 
     ``modules`` is a list of ``(slot_number, module_type_code)`` covering every
     slot from 1..gang_count exactly once.
+
+    Configuration validity is independent of geometry availability: missing
+    GLBs produce ``missing_assets`` warnings and ``assets_complete=False``.
     """
     normalized = _normalize_slot_modules(
         session, gang_count=gang_count, modules=modules
@@ -116,17 +201,12 @@ def resolve_render_state(
         session, finish_scheme_code
     )
 
-    manifest = get_asset_manifest()
-    asset_keys = _resolve_asset_keys(gang_count, normalized)
-    assets = [
-        ResolvedAsset(asset_key=asset_key, file=manifest.get(asset_key)["file"])
-        for asset_key in asset_keys
-    ]
-
+    assets, missing_assets = _resolve_geometry(gang_count, normalized)
     bom = build_prototype_bom(assets, selected_scheme.code)
 
     return RenderStateOut(
         is_valid=True,
+        assets_complete=len(missing_assets) == 0,
         assembly=ResolvedAssembly(
             gang_count=gang_count,
             modules=[
@@ -144,5 +224,6 @@ def resolve_render_state(
             for code, material in materials.items()
         },
         assets=assets,
+        missing_assets=missing_assets,
         bom=bom,
     )

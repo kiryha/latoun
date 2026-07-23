@@ -49,12 +49,37 @@ def _drop_legacy_configurations_table(bind) -> None:
         connection.execute(text("DROP TABLE IF EXISTS configurations"))
 
 
+def _ensure_module_type_columns(bind) -> None:
+    """Add newer ``module_types`` columns on existing SQLite databases."""
+    inspector = inspect(bind)
+    if "module_types" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("module_types")}
+    statements: list[str] = []
+    if "is_customer_visible" not in existing:
+        statements.append(
+            "ALTER TABLE module_types "
+            "ADD COLUMN is_customer_visible BOOLEAN NOT NULL DEFAULT 1"
+        )
+    if "sort_order" not in existing:
+        statements.append(
+            "ALTER TABLE module_types "
+            "ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+        )
+    if not statements:
+        return
+    with bind.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
 def init_database() -> None:
     """Create all tables if they do not yet exist, then apply lightweight migrations."""
     from . import models  # noqa: F401  (ensure models are registered)
 
     Base.metadata.create_all(bind=engine)
     _drop_legacy_configurations_table(engine)
+    _ensure_module_type_columns(engine)
 
 
 def get_session() -> Iterator[Session]:

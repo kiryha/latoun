@@ -108,6 +108,8 @@ export interface ModuleType {
   module_type_id: number;
   code: string;
   display_name: string;
+  is_active?: boolean;
+  is_customer_visible?: boolean;
 }
 
 export interface CatalogFinishScheme {
@@ -192,6 +194,23 @@ export interface ResolvedAssembly {
 export interface ResolvedAsset {
   asset_key: string;
   file: string;
+  role?: "plate" | "plate_screws" | "module" | string;
+  slot_number?: number | null;
+  module_type?: string | null;
+}
+
+export interface MissingAssetWarning {
+  asset_key: string;
+  role: string;
+  gang_count: number;
+  slot_number?: number | null;
+  module_type?: string | null;
+  message: string;
+}
+
+export interface MissingMaterialReport {
+  binding: string;
+  contexts: string[];
 }
 
 export interface BomLine {
@@ -203,11 +222,13 @@ export interface BomLine {
 
 export interface RenderState {
   is_valid: boolean;
+  assets_complete?: boolean;
   assembly: ResolvedAssembly;
   active_sources: string[];
   material_assignments: Record<string, string>;
   materials: Record<string, Material>;
   assets: ResolvedAsset[];
+  missing_assets?: MissingAssetWarning[];
   bom: BomLine[];
 }
 

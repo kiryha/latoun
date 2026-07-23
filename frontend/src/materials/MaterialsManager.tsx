@@ -203,17 +203,6 @@ export function MaterialsManager() {
       </aside>
 
       <section className="material-editor">
-        {error && (
-          <Banner kind="error" onDismiss={() => setError(null)}>
-            {error}
-          </Banner>
-        )}
-        {success && (
-          <Banner kind="success" onDismiss={() => setSuccess(null)}>
-            {success}
-          </Banner>
-        )}
-
         {draft ? (
           <>
             <div className="option-group">
@@ -337,6 +326,18 @@ export function MaterialsManager() {
         ) : (
           <div className="viewport-message">Select a material to preview.</div>
         )}
+        <div className="viewport-alerts">
+          {error && (
+            <Banner kind="error" onDismiss={() => setError(null)}>
+              {error}
+            </Banner>
+          )}
+          {success && (
+            <Banner kind="success" onDismiss={() => setSuccess(null)}>
+              {success}
+            </Banner>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -168,6 +168,8 @@ class ModuleTypeOut(BaseModel):
     module_type_id: int
     code: str
     display_name: str
+    is_active: bool = True
+    is_customer_visible: bool = True
 
 
 class CatalogFinishScheme(BaseModel):
@@ -270,6 +272,20 @@ class ResolvedAsset(BaseModel):
 
     asset_key: str
     file: str
+    role: str = "module"
+    slot_number: int | None = None
+    module_type: str | None = None
+
+
+class MissingAssetWarning(BaseModel):
+    """Registered-or-expected geometry that could not be resolved."""
+
+    asset_key: str
+    role: str
+    gang_count: int
+    slot_number: int | None = None
+    module_type: str | None = None
+    message: str
 
 
 class BomLine(BaseModel):
@@ -281,6 +297,7 @@ class BomLine(BaseModel):
 
 class RenderStateOut(BaseModel):
     is_valid: bool
+    assets_complete: bool = True
     assembly: ResolvedAssembly
     active_sources: list[str]
     # binding_name -> render material code
@@ -288,4 +305,5 @@ class RenderStateOut(BaseModel):
     # render material code -> full material definition
     materials: dict[str, MaterialOut]
     assets: list[ResolvedAsset]
+    missing_assets: list[MissingAssetWarning] = Field(default_factory=list)
     bom: list[BomLine]

@@ -86,7 +86,7 @@ body {
 .app-body {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr minmax(300px, 380px);
   min-height: 0;
 }
 
@@ -464,6 +464,30 @@ input[type="range"] {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 4px;
+  z-index: 2;
+}
+
+.viewport-alerts {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40%;
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.viewport-alerts .banner,
+.viewport-alerts .validation-stack {
+  pointer-events: auto;
+}
+
+.viewport-alerts .banner {
+  backdrop-filter: blur(4px);
 }
 
 .panel {
@@ -492,17 +516,32 @@ input[type="range"] {
 .segmented {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.segmented-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segmented-row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .segmented-button {
   flex: 1;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--panel-border);
   background: #2b3036;
   color: var(--text);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.25;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -606,6 +645,74 @@ input[type="range"] {
   background: var(--success-bg);
   border: 1px solid var(--success-border);
   color: #bfe0ac;
+}
+
+.banner-warning {
+  background: #3a3420;
+  border: 1px solid #7a6a35;
+  color: #f0e0a8;
+}
+
+.validation-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.validation-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.slot-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.slot-device {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.slot-device-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+.slot-device-select {
+  width: 100%;
+}
+
+.option-group > .option-label,
+.option-group > legend.option-label {
+  margin-bottom: 0;
+}
+
+fieldset.option-group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.missing-asset-label {
+  white-space: pre-line;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #d7dbe0;
+  background: rgba(20, 22, 26, 0.78);
+  border: 1px solid #5a616a;
+  border-radius: 4px;
+  padding: 4px 6px;
+  pointer-events: none;
 }
 
 .banner-close {

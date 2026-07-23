@@ -29,6 +29,10 @@ class AssetManifest:
                 f"Missing asset key in manifest: {asset_key}"
             ) from exc
 
+    def try_get(self, asset_key: str) -> dict | None:
+        """Return the asset entry, or ``None`` when the key is unregistered."""
+        return self.assets.get(asset_key)
+
     def file_for(self, asset_key: str) -> str:
         return self.get(asset_key)["file"]
 

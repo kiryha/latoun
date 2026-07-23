@@ -89,9 +89,38 @@ MATERIALS_SEED = [
 ]
 
 MODULE_TYPES_SEED = [
-    {"code": "switch", "display_name": "Switch", "is_active": True},
-    {"code": "dimmer", "display_name": "Rotary Dimmer", "is_active": True},
+    {
+        "code": "switch",
+        "display_name": "Switch",
+        "is_active": True,
+        "is_customer_visible": True,
+        "sort_order": 10,
+    },
+    {
+        "code": "dimmer",
+        "display_name": "Dimmer",
+        "is_active": True,
+        "is_customer_visible": True,
+        "sort_order": 20,
+    },
+    {
+        "code": "outlet",
+        "display_name": "Outlet",
+        "is_active": True,
+        "is_customer_visible": True,
+        "sort_order": 30,
+    },
+    {
+        "code": "usb_c_outlet",
+        "display_name": "USB-C Outlet",
+        "is_active": True,
+        "is_customer_visible": True,
+        "sort_order": 40,
+    },
 ]
+
+# Legacy codes retired in favor of the production catalog.
+OBSOLETE_MODULE_TYPE_CODES = ("rotary_dimmer",)
 
 FINISH_SCHEMES_SEED = [
     {
@@ -157,6 +186,16 @@ def _upsert_materials(session: Session) -> None:
 
 
 def _upsert_module_types(session: Session) -> None:
+    # Migrate ``rotary_dimmer`` back to the short production code ``dimmer``.
+    rotary = session.scalar(
+        select(ModuleType).where(ModuleType.code == "rotary_dimmer")
+    )
+    dimmer = session.scalar(select(ModuleType).where(ModuleType.code == "dimmer"))
+    if rotary is not None and dimmer is None:
+        rotary.code = "dimmer"
+        rotary.display_name = "Dimmer"
+        session.flush()
+
     for data in MODULE_TYPES_SEED:
         existing = session.scalar(
             select(ModuleType).where(ModuleType.code == data["code"])
@@ -166,6 +205,14 @@ def _upsert_module_types(session: Session) -> None:
         else:
             for key, value in data.items():
                 setattr(existing, key, value)
+
+    for obsolete_code in OBSOLETE_MODULE_TYPE_CODES:
+        obsolete = session.scalar(
+            select(ModuleType).where(ModuleType.code == obsolete_code)
+        )
+        if obsolete is not None:
+            obsolete.is_active = False
+            obsolete.is_customer_visible = False
 
 
 def _upsert_finish_schemes(session: Session) -> None:

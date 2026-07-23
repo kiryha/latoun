@@ -14,6 +14,7 @@ import type {
   FinishSchemeCreate,
   MaterialAdmin,
   MaterialAssignment,
+  MissingMaterialReport,
   RenderState,
 } from "../types";
 import { normalizeBindingName, validateBindingName } from "./bindingNames";
@@ -71,7 +72,9 @@ export function AssignmentsManager() {
 
   const [resolvedPreview, setResolvedPreview] = useState<RenderState | null>(null);
   const [discoveredBindings, setDiscoveredBindings] = useState<string[]>([]);
-  const [missingBindings, setMissingBindings] = useState<string[]>([]);
+  const [missingMaterials, setMissingMaterials] = useState<
+    MissingMaterialReport[]
+  >([]);
   const [assignmentStates, setAssignmentStates] = useState<AssignmentState[]>([]);
   const [previewAssignmentStateId, setPreviewAssignmentStateId] = useState<
     number | null
@@ -148,7 +151,7 @@ export function AssignmentsManager() {
     setError(null);
     setSuccess(null);
     setDiscoveredBindings([]);
-    setMissingBindings([]);
+    setMissingMaterials([]);
     try {
       const rows = await api.listAssignments(finishSchemeId);
       const drafts = toAssignmentDrafts(rows);
@@ -167,7 +170,7 @@ export function AssignmentsManager() {
     setSavedAssignments([]);
     setResolvedPreview(null);
     setDiscoveredBindings([]);
-    setMissingBindings([]);
+    setMissingMaterials([]);
     setError(null);
     setSuccess(null);
   };
@@ -336,7 +339,7 @@ export function AssignmentsManager() {
     if (assignmentStateId === null) {
       setResolvedPreview(null);
       setDiscoveredBindings([]);
-      setMissingBindings([]);
+      setMissingMaterials([]);
     }
   };
 
@@ -361,7 +364,7 @@ export function AssignmentsManager() {
       setPreviewAssignmentStateId(null);
       setResolvedPreview(null);
       setDiscoveredBindings([]);
-      setMissingBindings([]);
+      setMissingMaterials([]);
       setSuccess(`Deleted assembly state “${label}”.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -535,17 +538,6 @@ export function AssignmentsManager() {
       </aside>
 
       <section className="material-editor">
-        {error && (
-          <Banner kind="error" onDismiss={() => setError(null)}>
-            {error}
-          </Banner>
-        )}
-        {success && (
-          <Banner kind="success" onDismiss={() => setSuccess(null)}>
-            {success}
-          </Banner>
-        )}
-
         {schemeDraft ? (
           <>
             <div className="option-group">
@@ -810,15 +802,6 @@ export function AssignmentsManager() {
                   </>
                 )}
 
-                {missingBindings.length > 0 && (
-                  <Banner kind="error">
-                    Missing assignments for:{" "}
-                    {missingBindings
-                      .map((binding) => (binding === "" ? "(empty)" : binding))
-                      .join(", ")}
-                    . Affected geometry is shown in magenta.
-                  </Banner>
-                )}
               </>
             )}
           </>
@@ -895,7 +878,7 @@ export function AssignmentsManager() {
               <Scene
                 renderState={resolvedPreview}
                 onAssetError={setError}
-                onMissingBindings={setMissingBindings}
+                onMissingMaterials={setMissingMaterials}
                 onDiscoveredBindings={setDiscoveredBindings}
               />
               {resolvingPreview && (
@@ -909,6 +892,33 @@ export function AssignmentsManager() {
                 : "Select an active finish scheme to preview."}
             </div>
           )}
+          <div className="viewport-alerts">
+            {error && (
+              <Banner kind="error" onDismiss={() => setError(null)}>
+                {error}
+              </Banner>
+            )}
+            {success && (
+              <Banner kind="success" onDismiss={() => setSuccess(null)}>
+                {success}
+              </Banner>
+            )}
+            {missingMaterials.length > 0 && (
+              <Banner kind="error">
+                Missing assignments for:{" "}
+                {missingMaterials
+                  .map((item) => {
+                    const binding =
+                      item.binding === "" ? "(empty)" : item.binding;
+                    return item.contexts.length > 0
+                      ? `${binding} (${item.contexts.join(", ")})`
+                      : binding;
+                  })
+                  .join(", ")}
+                . Affected geometry is shown in magenta.
+              </Banner>
+            )}
+          </div>
         </div>
       </section>
     </div>

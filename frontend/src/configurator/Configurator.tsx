@@ -1,37 +1,55 @@
-// Assembly tab: live preview of a device + finish scheme.
-// "Save Current State" stores the assembly as an Assembly State for the
-// Assignments tab viewport.
+// Assembly tab: complete production assembly (plate + per-slot devices + finish).
+// Public editing uses local UI state only. "Save Current State" (admin) persists
+// an Assignment State for the Assignments tab viewport.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { Banner } from "../components/Banner";
 import { BomPanel } from "../components/BomPanel";
-import { SegmentedControl } from "../components/SegmentedControl";
 import { Scene } from "../three/Scene";
-import type { Catalog, RenderState, ResolvedSlotModule } from "../types";
+import type {
+  Catalog,
+  MissingMaterialReport,
+  RenderState,
+} from "../types";
+import { isAdminMode } from "./adminMode";
+import {
+  changeFinishScheme,
+  changeGangCount,
+  changeSlotModule,
+  createDefaultConfiguration,
+  isModuleTypeCode,
+  toResolvePayload,
+  validateConfiguration,
+} from "./assemblyConfigurationService";
+import { AssemblyAdminActions } from "./AssemblyAdminActions";
+import { AssemblySummary } from "./AssemblySummary";
+import { AssemblyValidationPanel } from "./AssemblyValidationPanel";
+import { buildAssemblyStateName } from "./assemblyStateNameService";
+import type {
+  AssemblyConfiguration,
+  GangCount,
+  ModuleTypeCode,
+  ModuleTypeOption,
+} from "./assemblyTypes";
 import { downloadAssemblyJson } from "./exportConfiguration";
+import { FinishSelector } from "./FinishSelector";
+import { PlateSelector } from "./PlateSelector";
+import { SlotDeviceList } from "./SlotDeviceList";
 
-const DEFAULT_MODULE_TYPE = "dimmer";
-const DEFAULT_FINISH_SCHEME = "brass";
-const GANG_COUNT = 1;
-
-/** Build Assembly State display name from slot module type codes. */
-export function buildAssignmentStateDisplayName(
-  modules: ResolvedSlotModule[],
-): string {
-  return [...modules]
-    .sort((a, b) => a.slot_number - b.slot_number)
-    .map((module) => module.module_type)
-    .join("-");
-}
+export { buildAssemblyStateName };
 
 export function Configurator() {
+  const adminMode = isAdminMode();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [moduleType, setModuleType] = useState(DEFAULT_MODULE_TYPE);
-  const [finishScheme, setFinishScheme] = useState(DEFAULT_FINISH_SCHEME);
+  const [configuration, setConfiguration] = useState<AssemblyConfiguration>(
+    () => createDefaultConfiguration(),
+  );
 
   const [renderState, setRenderState] = useState<RenderState | null>(null);
-  const [missingBindings, setMissingBindings] = useState<string[]>([]);
+  const [missingMaterials, setMissingMaterials] = useState<
+    MissingMaterialReport[]
+  >([]);
 
   const [isResolving, setIsResolving] = useState(false);
   const [isSavingState, setIsSavingState] = useState(false);
@@ -46,10 +64,12 @@ export function Configurator() {
         if (
           loadedCatalog.finish_schemes.length > 0 &&
           !loadedCatalog.finish_schemes.some(
-            (scheme) => scheme.code === DEFAULT_FINISH_SCHEME,
+            (scheme) => scheme.code === configuration.finishSchemeCode,
           )
         ) {
-          setFinishScheme(loadedCatalog.finish_schemes[0].code);
+          setConfiguration((current) =>
+            changeFinishScheme(current, loadedCatalog.finish_schemes[0].code),
+          );
         }
       } catch (err) {
         setError(
@@ -59,6 +79,8 @@ export function Configurator() {
         );
       }
     })();
+    // Intentionally run once on mount for catalog bootstrap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -66,13 +88,9 @@ export function Configurator() {
     (async () => {
       setIsResolving(true);
       setError(null);
-      setMissingBindings([]);
+      setMissingMaterials([]);
       try {
-        const resolved = await api.resolveRender({
-          gang_count: GANG_COUNT,
-          modules: [{ slot_number: 1, module_type: moduleType }],
-          finish_scheme: finishScheme,
-        });
+        const resolved = await api.resolveRender(toResolvePayload(configuration));
         if (!cancelled) setRenderState(resolved);
       } catch (err) {
         if (!cancelled) {
@@ -85,18 +103,23 @@ export function Configurator() {
     return () => {
       cancelled = true;
     };
-  }, [moduleType, finishScheme]);
+  }, [configuration]);
 
-  const handleMissingBindings = useCallback((bindings: string[]) => {
-    setMissingBindings(bindings);
-  }, []);
+  const handleMissingMaterials = useCallback(
+    (reports: MissingMaterialReport[]) => {
+      setMissingMaterials(reports);
+    },
+    [],
+  );
 
-  const moduleOptions = useMemo(
+  const moduleOptions = useMemo<ModuleTypeOption[]>(
     () =>
-      catalog?.module_types.map((mt) => ({
-        code: mt.code,
-        label: mt.display_name,
-      })) ?? [],
+      (catalog?.module_types ?? [])
+        .filter((mt) => isModuleTypeCode(mt.code))
+        .map((mt) => ({
+          code: mt.code as ModuleTypeCode,
+          displayName: mt.display_name,
+        })),
     [catalog],
   );
 
@@ -111,44 +134,73 @@ export function Configurator() {
 
   const finishDisplayName = useMemo(() => {
     const scheme = catalog?.finish_schemes.find(
-      (item) => item.code === finishScheme,
+      (item) => item.code === configuration.finishSchemeCode,
     );
-    return scheme?.display_name ?? finishScheme;
-  }, [catalog, finishScheme]);
+    return scheme?.display_name ?? configuration.finishSchemeCode;
+  }, [catalog, configuration.finishSchemeCode]);
 
-  const moduleDisplayName = useMemo(() => {
-    const module = catalog?.module_types.find((item) => item.code === moduleType);
-    return module?.display_name ?? moduleType;
-  }, [catalog, moduleType]);
+  const configurationIssues = useMemo(
+    () =>
+      validateConfiguration(configuration, {
+        moduleOptions,
+        finishSchemeCodes: finishOptions.map((option) => option.code),
+      }),
+    [configuration, moduleOptions, finishOptions],
+  );
+
+  const missingAssets = renderState?.missing_assets ?? [];
+
+  const handleGangChange = (gangCount: GangCount) => {
+    setConfiguration((current) => changeGangCount(current, gangCount));
+  };
+
+  const handleSlotChange = (
+    slotNumber: number,
+    moduleTypeCode: ModuleTypeCode,
+  ) => {
+    setConfiguration((current) =>
+      changeSlotModule(current, slotNumber, moduleTypeCode),
+    );
+  };
+
+  const handleFinishChange = (finishSchemeCode: string) => {
+    setConfiguration((current) =>
+      changeFinishScheme(current, finishSchemeCode),
+    );
+  };
 
   const handleSaveCurrentState = async () => {
-    if (!renderState || !catalog) return;
+    if (!catalog || configurationIssues.length > 0) return;
 
-    const displayName = buildAssignmentStateDisplayName(
-      renderState.assembly.modules,
-    );
+    const displayName = buildAssemblyStateName(configuration);
     setIsSavingState(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
       const finishSchemes = await api.listFinishSchemes();
-      const finish = finishSchemes.find((scheme) => scheme.code === finishScheme);
+      const finish = finishSchemes.find(
+        (scheme) => scheme.code === configuration.finishSchemeCode,
+      );
       if (!finish) {
-        throw new Error(`Finish scheme “${finishScheme}” was not found.`);
+        throw new Error(
+          `Finish scheme “${configuration.finishSchemeCode}” was not found.`,
+        );
       }
 
-      const modules = [...renderState.assembly.modules]
-        .sort((a, b) => a.slot_number - b.slot_number)
+      const modules = [...configuration.slots]
+        .sort((a, b) => a.slotNumber - b.slotNumber)
         .map((slot) => {
           const moduleTypeRow = catalog.module_types.find(
-            (item) => item.code === slot.module_type,
+            (item) => item.code === slot.moduleTypeCode,
           );
           if (!moduleTypeRow) {
-            throw new Error(`Module type “${slot.module_type}” was not found.`);
+            throw new Error(
+              `Module type “${slot.moduleTypeCode}” was not found.`,
+            );
           }
           return {
-            slot_number: slot.slot_number,
+            slot_number: slot.slotNumber,
             module_type_id: moduleTypeRow.module_type_id,
           };
         });
@@ -162,7 +214,7 @@ export function Configurator() {
           existing.assignment_state_id,
           {
             display_name: displayName,
-            gang_count: renderState.assembly.gang_count,
+            gang_count: configuration.gangCount,
             default_finish_scheme_id: finish.finish_scheme_id,
             is_active: true,
             modules,
@@ -174,7 +226,7 @@ export function Configurator() {
       } else {
         const created = await api.createAssignmentState({
           display_name: displayName,
-          gang_count: renderState.assembly.gang_count,
+          gang_count: configuration.gangCount,
           default_finish_scheme_id: finish.finish_scheme_id,
           is_active: true,
           sort_order: 0,
@@ -199,7 +251,7 @@ export function Configurator() {
             <Scene
               renderState={renderState}
               onAssetError={setError}
-              onMissingBindings={handleMissingBindings}
+              onMissingMaterials={handleMissingMaterials}
             />
           ) : (
             <div className="viewport-message">
@@ -209,102 +261,62 @@ export function Configurator() {
           {isResolving && (
             <div className="viewport-badge">Resolving assembly…</div>
           )}
+          <div className="viewport-alerts">
+            {error && (
+              <Banner kind="error" onDismiss={() => setError(null)}>
+                {error}
+              </Banner>
+            )}
+            {successMessage && (
+              <Banner kind="success" onDismiss={() => setSuccessMessage(null)}>
+                {successMessage}
+              </Banner>
+            )}
+            <AssemblyValidationPanel
+              configurationIssues={configurationIssues}
+              missingAssets={missingAssets}
+              missingMaterials={missingMaterials}
+              finishSchemeCode={configuration.finishSchemeCode}
+            />
+          </div>
         </main>
 
         <aside className="panel">
-          {error && (
-            <Banner kind="error" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          )}
-          {successMessage && (
-            <Banner kind="success" onDismiss={() => setSuccessMessage(null)}>
-              {successMessage}
-            </Banner>
-          )}
-          {missingBindings.length > 0 && (
-            <Banner kind="error">
-              <strong>Missing material assignment</strong>
-              <br />
-              Finish scheme: {finishDisplayName}
-              <br />
-              {missingBindings.length === 1 ? "Binding: " : "Bindings: "}
-              {missingBindings.map((b) => (b === "" ? "(empty)" : b)).join(", ")}
-              <br />
-              No assignment was found in {finishDisplayName} or Init. Affected
-              geometry is shown in magenta.
-            </Banner>
-          )}
+          <PlateSelector
+            value={configuration.gangCount}
+            onChange={handleGangChange}
+            disabled={!catalog}
+          />
 
-          <section className="option-group">
-            <label className="option-label">Device</label>
-            <SegmentedControl
-              options={moduleOptions}
-              value={moduleType}
-              onChange={setModuleType}
-              disabled={!catalog}
+          <SlotDeviceList
+            slots={configuration.slots}
+            options={moduleOptions}
+            onChange={handleSlotChange}
+            disabled={!catalog}
+          />
+
+          <FinishSelector
+            value={configuration.finishSchemeCode}
+            options={finishOptions}
+            onChange={handleFinishChange}
+            disabled={!catalog}
+          />
+
+          <AssemblySummary
+            configuration={configuration}
+            moduleOptions={moduleOptions}
+            finishDisplayName={finishDisplayName}
+          />
+
+          {adminMode && (
+            <AssemblyAdminActions
+              canSave={configurationIssues.length === 0}
+              canExport
+              isSaving={isSavingState}
+              onSave={() => void handleSaveCurrentState()}
+              onExport={() => downloadAssemblyJson(configuration, renderState)}
             />
-          </section>
-
-          <section className="option-group">
-            <label className="option-label">Finish</label>
-            <SegmentedControl
-              options={finishOptions}
-              value={finishScheme}
-              onChange={setFinishScheme}
-              disabled={!catalog}
-            />
-          </section>
-
-          <section className="summary">
-            <h3>Assembly</h3>
-            {renderState ? (
-              <dl>
-                <div>
-                  <dt>Gang count</dt>
-                  <dd>{renderState.assembly.gang_count}</dd>
-                </div>
-                <div>
-                  <dt>Device</dt>
-                  <dd>{moduleDisplayName}</dd>
-                </div>
-                <div>
-                  <dt>Finish</dt>
-                  <dd>{finishDisplayName}</dd>
-                </div>
-                <div>
-                  <dt>State name</dt>
-                  <dd className="mono">
-                    {buildAssignmentStateDisplayName(renderState.assembly.modules)}
-                  </dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="muted">No resolved assembly.</p>
-            )}
-          </section>
-
-          <div className="actions">
-            <button
-              type="button"
-              className="button primary"
-              onClick={() => void handleSaveCurrentState()}
-              disabled={!renderState || isSavingState}
-            >
-              {isSavingState ? "Saving…" : "Save Current State"}
-            </button>
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                if (!renderState) return;
-                downloadAssemblyJson(renderState);
-              }}
-              disabled={!renderState}
-            >
-              Export JSON
-            </button>
-          </div>
+          )}
         </aside>
       </div>
 

@@ -3,7 +3,7 @@
 Entities modeled in this iteration:
 
 * ``materials`` — Three.js render-material definitions (implementation-level).
-* ``module_types`` — functional module placed in a slot (switch / dimmer).
+* ``module_types`` — functional module placed in a slot (switch, dimmer, …).
 * ``finish_schemes`` — customer-visible finish choices (brass, steel, …) plus
   the hidden internal ``init`` scheme that holds static assignments.
 * ``material_assignments`` — the authoritative mapping
@@ -62,7 +62,7 @@ class Material(Base):
 
 
 class ModuleType(Base):
-    """Functional module type that can be placed in a slot (switch / dimmer)."""
+    """Functional module type that can be placed in any slot."""
 
     __tablename__ = "module_types"
 
@@ -70,6 +70,10 @@ class ModuleType(Base):
     code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_customer_visible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 class FinishScheme(Base):

@@ -28,15 +28,20 @@ import {
   OrbitControls,
 } from "@react-three/drei";
 import * as THREE from "three";
-import type { RenderState } from "../types";
+import type { MissingMaterialReport, RenderState } from "../types";
 import { AssetModel } from "./AssetModel";
+import {
+  describeAssetContext,
+  placeholderOffsetX,
+} from "./assetContext";
 import { buildRenderMaterialMap } from "./materials";
+import { MissingModulePlaceholder } from "./MissingModulePlaceholder";
 
 interface SceneProps {
   renderState: RenderState;
   onAssetError: (message: string) => void;
-  // Reports the union of unresolved semantic bindings across all loaded assets.
-  onMissingBindings?: (missingBindings: string[]) => void;
+  // Reports missing bindings with asset/slot context for the validation panel.
+  onMissingMaterials?: (reports: MissingMaterialReport[]) => void;
   // Reports the union of all imported binding names across all loaded assets.
   onDiscoveredBindings?: (discoveredBindings: string[]) => void;
 }
@@ -44,6 +49,10 @@ interface SceneProps {
 interface AssemblyMeasurement {
   groundY: number;
   radius: number;
+}
+
+function slotGroupName(slotNumber: number): string {
+  return `Slot_${String(slotNumber).padStart(2, "0")}`;
 }
 
 function Assembly({
@@ -63,11 +72,10 @@ function Assembly({
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Re-key the effect on the resolved asset/finish set so we re-measure when
-  // the device or finish changes.
-  const signature = `${renderState.assembly.gang_count}:${renderState.assembly.modules
+  // Geometry signature excludes finish so finish changes do not remount GLBs.
+  const geometrySignature = `${renderState.assembly.gang_count}:${renderState.assembly.modules
     .map((module) => `${module.slot_number}:${module.module_type}`)
-    .join(",")}:${renderState.assembly.finish_scheme}`;
+    .join(",")}`;
 
   useLayoutEffect(() => {
     if (!groupRef.current) return;
@@ -77,19 +85,81 @@ function Assembly({
     box.getSize(size);
     const radius = Math.max(size.x, size.y, size.z) * 0.75 || 0.5;
     onMeasured({ groundY: box.min.y, radius });
-  }, [signature, onMeasured]);
+  }, [geometrySignature, onMeasured]);
+
+  const plate = renderState.assets.find((asset) => asset.role === "plate");
+  const screws = renderState.assets.find(
+    (asset) => asset.role === "plate_screws",
+  );
+  const modules = renderState.assets.filter((asset) => asset.role === "module");
+  const missingAssets = renderState.missing_assets ?? [];
+  const missingPlate = missingAssets.some((asset) => asset.role === "plate");
+  const missingModules = missingAssets.filter(
+    (asset) => asset.role === "module" && asset.slot_number != null,
+  );
+  const plateWidth = 0.08 + renderState.assembly.gang_count * 0.05;
 
   return (
-    <group ref={groupRef}>
-      {renderState.assets.map((asset) => (
-        <AssetModel
-          key={asset.asset_key}
-          asset={asset}
-          materialAssignments={renderState.material_assignments}
-          renderMaterials={renderMaterials}
-          onResult={onResult}
-        />
-      ))}
+    <group ref={groupRef} name="AssemblyRoot">
+      {plate && (
+        <group name="Plate">
+          <AssetModel
+            key={plate.asset_key}
+            asset={plate}
+            materialAssignments={renderState.material_assignments}
+            renderMaterials={renderMaterials}
+            onResult={onResult}
+          />
+        </group>
+      )}
+
+      {missingPlate && (
+        <mesh name="PlatePlaceholder">
+          <boxGeometry args={[plateWidth, 0.1, 0.012]} />
+          <meshStandardMaterial color="#5c636b" roughness={0.9} metalness={0.05} />
+        </mesh>
+      )}
+
+      {screws && (
+        <group name="PlateScrews">
+          <AssetModel
+            key={screws.asset_key}
+            asset={screws}
+            materialAssignments={renderState.material_assignments}
+            renderMaterials={renderMaterials}
+            onResult={onResult}
+          />
+        </group>
+      )}
+
+      {modules.map((asset) => {
+        const slotNumber = asset.slot_number ?? 0;
+        return (
+          <group key={asset.asset_key} name={slotGroupName(slotNumber)}>
+            <AssetModel
+              asset={asset}
+              materialAssignments={renderState.material_assignments}
+              renderMaterials={renderMaterials}
+              onResult={onResult}
+            />
+          </group>
+        );
+      })}
+
+      {missingModules.map((warning) => {
+        const slotNumber = warning.slot_number ?? 1;
+        return (
+          <MissingModulePlaceholder
+            key={warning.asset_key}
+            slotNumber={slotNumber}
+            moduleType={warning.module_type ?? "module"}
+            offsetX={placeholderOffsetX(
+              slotNumber,
+              renderState.assembly.gang_count,
+            )}
+          />
+        );
+      })}
     </group>
   );
 }
@@ -135,7 +205,7 @@ function LoadingFallback() {
 export function Scene({
   renderState,
   onAssetError,
-  onMissingBindings,
+  onMissingMaterials,
   onDiscoveredBindings,
 }: SceneProps) {
   const [measurement, setMeasurement] = useState<AssemblyMeasurement>({
@@ -156,15 +226,23 @@ export function Scene({
     };
   }, [renderMaterials]);
 
-  // Aggregate per-asset binding results into unions over the current asset set.
+  const contextByAsset = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const asset of renderState.assets) {
+      map.set(asset.asset_key, describeAssetContext(asset));
+    }
+    return map;
+  }, [renderState.assets]);
+
+  // Aggregate per-asset binding results into contextual material reports.
   const missingByAsset = useRef<Record<string, string[]>>({});
   const discoveredByAsset = useRef<Record<string, string[]>>({});
-  const resultEpoch = `${renderState.assembly.gang_count}:${renderState.assembly.modules
+  const geometryEpoch = `${renderState.assembly.gang_count}:${renderState.assembly.modules
     .map((module) => `${module.slot_number}:${module.module_type}`)
-    .join(",")}:${renderState.assembly.finish_scheme}`;
-  const resultEpochRef = useRef(resultEpoch);
-  if (resultEpochRef.current !== resultEpoch) {
-    resultEpochRef.current = resultEpoch;
+    .join(",")}`;
+  const resultEpochRef = useRef(geometryEpoch);
+  if (resultEpochRef.current !== geometryEpoch) {
+    resultEpochRef.current = geometryEpoch;
     missingByAsset.current = {};
     discoveredByAsset.current = {};
   }
@@ -175,11 +253,23 @@ export function Scene({
       discoveredByAsset.current[assetKey] = discovered;
 
       const assetKeys = renderState.assets.map((asset) => asset.asset_key);
-      if (onMissingBindings) {
-        const union = Array.from(
-          new Set(assetKeys.flatMap((key) => missingByAsset.current[key] ?? [])),
-        ).sort();
-        onMissingBindings(union);
+      if (onMissingMaterials) {
+        const byBinding = new Map<string, Set<string>>();
+        for (const key of assetKeys) {
+          const context = contextByAsset.get(key) ?? key;
+          for (const binding of missingByAsset.current[key] ?? []) {
+            const contexts = byBinding.get(binding) ?? new Set<string>();
+            contexts.add(context);
+            byBinding.set(binding, contexts);
+          }
+        }
+        const reports: MissingMaterialReport[] = Array.from(byBinding.entries())
+          .map(([binding, contexts]) => ({
+            binding,
+            contexts: Array.from(contexts).sort(),
+          }))
+          .sort((a, b) => a.binding.localeCompare(b.binding));
+        onMissingMaterials(reports);
       }
       if (onDiscoveredBindings) {
         const union = Array.from(
@@ -190,8 +280,16 @@ export function Scene({
         onDiscoveredBindings(union);
       }
     },
-    [renderState.assets, onMissingBindings, onDiscoveredBindings],
+    [
+      renderState.assets,
+      contextByAsset,
+      onMissingMaterials,
+      onDiscoveredBindings,
+    ],
   );
+
+  // Remount error boundary on gang/module geometry changes only — not finish.
+  const boundaryKey = geometryEpoch;
 
   return (
     <Canvas
@@ -207,13 +305,7 @@ export function Scene({
       <color attach="background" args={["#2b3036"]} />
 
       <Suspense fallback={<LoadingFallback />}>
-        {/* Remounting on config change resets the error boundary cleanly. */}
-        <R3FErrorBoundary
-          key={`${renderState.assembly.gang_count}:${renderState.assembly.finish_scheme}:${renderState.assembly.modules
-            .map((module) => `${module.slot_number}:${module.module_type}`)
-            .join(",")}`}
-          onError={onAssetError}
-        >
+        <R3FErrorBoundary key={boundaryKey} onError={onAssetError}>
           {/* Sole light source: the equirectangular HDRI environment. */}
           <Environment files={HDRI_PATH} />
           <Bounds fit clip observe margin={1.3}>

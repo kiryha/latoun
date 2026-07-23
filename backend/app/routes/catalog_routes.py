@@ -29,8 +29,11 @@ def get_catalog(session: Session = Depends(get_session)) -> CatalogOut:
     )
     module_types = session.scalars(
         select(ModuleType)
-        .where(ModuleType.is_active.is_(True))
-        .order_by(ModuleType.code)
+        .where(
+            ModuleType.is_active.is_(True),
+            ModuleType.is_customer_visible.is_(True),
+        )
+        .order_by(ModuleType.sort_order, ModuleType.code)
     ).all()
 
     return CatalogOut(
