@@ -34,7 +34,7 @@ The implementation must include:
 
 - Database tables for finish schemes and semantic material assignments
 - A new internal `Assignments` tab (finish-scheme bindings + assembly preview)
-- An admin-only `Assignment States` tab (persisted viewport assemblies)
+- An admin Assignment States system (persisted viewport assemblies for Assignments preview)
 - Backend CRUD endpoints
 - Assignment resolution logic
 - Semantic material application in Three.js
@@ -52,21 +52,27 @@ The current internal application contains:
 ```text
 Assembly
 Materials
-Assignment States
 Assignments
 ```
 
 The `Assembly` tab allows the user to:
 
-- Select a device:
-  - Rotary Dimmer
+- Select plate gang count (1–4)
+- Select one device per slot:
   - Switch
-- Select a customer-visible finish scheme
-- Preview the assembled product live
-- Export the active assembly as JSON
+  - Dimmer
+  - Outlet
+  - USB-C Outlet
+- Select a customer-visible finish scheme for the complete assembly
+- Preview the assembled product live (placeholders for missing GLBs)
+- Export the active assembly as JSON (admin)
+- Save Current State into Assignment States (admin; geometry-only name)
 - View a prototype BOM
 
-The Assembly tab does **not** save or reload assemblies.
+Public Assembly editing uses current UI state only — it does not load an
+`assignment_state_id` while configuring.
+
+Error / warning / success messages overlay at the bottom of the 3D viewport.
 
 The `Materials` tab allows internal users to:
 
@@ -76,12 +82,14 @@ The `Materials` tab allows internal users to:
 - Enable or disable materials
 - Preview materials on test geometry
 
-The `Assignment States` tab is admin-only CRUD for persisted viewport assemblies:
+Assignment States are admin viewport presets (CRUD via API; pickable in the
+Assignments preview toolbar; created from Assembly Save Current State):
 
-- Gang count (1–4; only 1-gang GLBs exist today)
+- Gang count (1–4; only 1-gang GLBs exist today for most combinations)
 - One module type per slot
-- Default finish scheme for preview
+- Optional default finish scheme for Assignments preview
 - Codes `LAT-ASG-######`
+- Display names are geometry-only (no finish suffix)
 
 The `Assignments` tab is an internal administration tool for finish-scheme material bindings and live assembly preview:
 
@@ -89,6 +97,7 @@ The `Assignments` tab is an internal administration tool for finish-scheme mater
 - Pick an Assignment State for geometry
 - Choose a finish scheme independently for materials
 - Select **None** to show the material hero preview instead of an assembly
+- Surface error / success / missing-assignment banners at the bottom of the preview viewport
 
 Existing render-material properties include:
 
@@ -744,37 +753,39 @@ init < selected finish scheme
 
 ## 14. New `Assignments` Tab
 
-The application has four top-level tabs:
+The application has three top-level tabs:
 
 ```text
-Assembly | Materials | Assignment States | Assignments
+Assembly | Materials | Assignments
 ```
 
 The `Assignments` tab is an internal administration tool for finish-scheme material bindings and live preview.
 
-The `Assignment States` tab (admin-only) persists viewport assemblies used by the Assignments tab for geometry. See `docs/configurator.md` §8.3.
+Assignment States persist viewport assemblies used by the Assignments tab for geometry (created via Assembly Save Current State or the API). See `docs/coding_briefs/configurator.md` §8.3.
 
-The future customer-facing configurator should not expose the Assignment States or Assignments tabs.
+The future customer-facing configurator should not expose the Assignments tab (and should hide Assembly admin actions via `VITE_ADMIN_MODE=false`).
+
+Error / success / missing-assignment banners overlay at the bottom of the Assignments preview viewport.
 
 ### 14.1 Layout
 
 Recommended desktop layout:
 
 ```text
-┌───────────────────────────────────────────────────────────────────┐
-│ Assembly | Materials | Assignment States | Assignments            │
-├───────────────────┬──────────────────────────────┬────────────────┤
-│ Finish Schemes    │ Scheme Properties            │ Preview        │
-│                   │                              │                │
-│ Init              │ Code                         │ Current        │
-│ Brass             │ Display Name                 │ assembly or    │
-│ Steel             │ Description                  │ test object    │
-│ Black             │ Active                       │                │
-│                   │ Customer Visible             │                │
-│ + New             │                              │                │
-│                   │ Semantic Assignments         │                │
-│                   │ Binding → Render Material    │                │
-└───────────────────┴──────────────────────────────┴────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│ Assembly | Materials | Assignments                            │
+├───────────────────┬──────────────────────────┬────────────────┤
+│ Finish Schemes    │ Scheme Properties        │ Preview        │
+│                   │                          │ (alerts bottom)│
+│ Init              │ Code                     │ Current        │
+│ Brass             │ Display Name             │ assembly or    │
+│ Steel             │ Description              │ test object    │
+│ Black             │ Active                   │                │
+│                   │ Customer Visible         │                │
+│ + New             │                          │                │
+│                   │ Semantic Assignments     │                │
+│                   │ Binding → Render Material│                │
+└───────────────────┴──────────────────────────┴────────────────┘
 ```
 
 The exact layout may follow the visual language of the existing Materials tab.
@@ -970,7 +981,11 @@ Do not build finish buttons from the `materials` table.
 
 A finish scheme can resolve multiple render materials.
 
-The Assembly tab resolves ad-hoc assemblies via `POST /api/render/resolve`. It does **not** persist finish scheme or geometry choices. Finish schemes still resolve materials through `material_assignments`.
+The Assembly tab resolves multi-slot assemblies via `POST /api/render/resolve`
+from current UI state. Admin **Save Current State** persists geometry into
+Assignment States. Finish schemes still resolve materials through
+`material_assignments`. Missing geometry returns `missing_assets` without
+failing the request.
 
 ---
 
@@ -1161,23 +1176,22 @@ function createMissingBindingMaterial(
 When a binding is missing:
 
 - Render the affected geometry in magenta
-- Show a visible warning in the Assembly UI
-- Include the binding name
+- Show a visible warning at the bottom of the 3D viewport
+- Include the binding name and asset/slot context where available
 - Do not silently leave the Houdini placeholder material
 - Do not silently apply the first selected finish material
 
 Example warning:
 
 ```text
-Missing material assignment:
-
-Finish scheme: Brass
-Binding: electrical_core
-
-No assignment was found in Brass or Init.
+Missing material assignments
+brass + electrical_core — plate
 ```
 
 The assembly may still render, but its validation status must show a material-assignment error.
+
+Missing geometry (unregistered GLB keys) is a separate warning class and uses
+neutral placeholders — not magenta.
 
 ---
 
@@ -1321,7 +1335,6 @@ material_assignments
 assignment_states
 assignment_state_modules
 Assignments tab
-Assignment States tab
 ```
 
 Keep existing rendering temporarily.
@@ -1390,36 +1403,35 @@ exported render state
 
 ## 26. Exported Assembly JSON
 
-Update JSON export to store the assembly and resolved semantic mapping.
-
-Example:
+Export the structured public assembly. Geometry state names omit finish:
 
 ```json
 {
+  "schema_version": 1,
   "gang_count": 1,
-  "modules": [
-    { "slot_number": 1, "module_type": "dimmer" }
+  "finish_scheme_code": "brass",
+  "slots": [
+    { "slot_number": 1, "module_type_code": "dimmer" }
   ],
-  "finish_scheme": "brass",
-  "assignment_state_code": "LAT-ASG-000001",
-  "assets": [
-    "plate.1gang",
-    "hardware.1gang.plate_screws",
-    "module.1gang.slot01.dimmer"
-  ],
-  "resolved_material_assignments": {
-    "primary_metal": "brass_brushed",
-    "hardware_metal": "brass_brushed",
-    "actuator_metal": "brass_brushed",
-    "electrical_core": "black_plastic_matte"
+  "state_name": "dimmer",
+  "debug": {
+    "assets": [
+      "plate.1gang",
+      "hardware.1gang.plate_screws",
+      "module.1gang.slot01.dimmer"
+    ],
+    "missing_assets": [],
+    "resolved_material_assignments": {},
+    "prototype_bom": []
   }
 }
 ```
 
-The export is a snapshot for debugging and reproducibility. Persisted viewport assemblies live in Assignment States; the Assembly tab exports ad-hoc drafts without saving.
+The export is a snapshot for debugging and reproducibility. Persisted viewport
+assemblies live in Assignment States (via Save Current State); the public
+Assembly UI does not require an assignment state while editing.
 
 ---
-
 ## 27. Tests
 
 ### 27.1 Backend Tests
@@ -1552,7 +1564,7 @@ finish_scheme + binding_name → render_material
 
 The implementation is complete when:
 
-1. The application has internal `Assignment States` and `Assignments` tabs.
+1. The application has Assembly, Materials, and Assignments tabs (Assignment States are presets, not a separate top-level tab).
 2. Finish schemes can be created, edited, enabled, disabled, and deleted under the defined rules.
 3. Semantic assignments can be created, edited, and removed.
 4. Assignments are stored in SQLite.

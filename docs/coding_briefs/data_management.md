@@ -64,6 +64,10 @@ The current geometry assets are:
 1gang_slot01_switch.glb
 ```
 
+Additional module types (`outlet`, `usb_c_outlet`) and 2?4 gang assets may be
+selected in the Assembly UI before GLBs are registered. Unregistered keys return
+as `missing_assets` warnings with viewport placeholders ? never substitute
+another device's GLB.
 
 ---
 
@@ -541,7 +545,7 @@ bind_steel
 bind_black
 ```
 
-The binding describes the geometryùs role, not its final appearance.
+The binding describes the geometry?s role, not its final appearance.
 
 Example:
 
@@ -606,9 +610,13 @@ Three.js replaces each placeholder material with the resolved render material.
 
 ---
 
-## 14. Temporary `replace_all` Policy
+## 14. Temporary `replace_all` Policy (historical)
 
-The first configurator can use a temporary simplified material policy:
+> **Status:** Superseded. The configurator now uses semantic bindings
+> (`finish scheme + binding name ? render material`) with `init` fallback.
+> The asset manifest no longer carries `material_policy`.
+
+The first configurator used a temporary simplified material policy:
 
 ```json
 {
@@ -752,7 +760,10 @@ Example:
 }
 ```
 
-Persisted viewport assemblies are stored as **Assignment States** (`assignment_states` + `assignment_state_modules`). The Assembly tab uses ad-hoc `POST /api/render/resolve`; the Assignments tab loads saved states via `GET /api/assignment-states/{id}/render-state`.
+Persisted viewport assemblies are stored as **Assignment States** (`assignment_states` + `assignment_state_modules`). The Assembly tab edits a public multi-slot configuration in UI state and resolves via `POST /api/render/resolve`. Admin **Save Current State** writes geometry into Assignment States. The Assignments tab loads saved states via `GET /api/assignment-states/{id}/render-state`.
+
+Unregistered asset keys do not fail the request: the response includes
+`assets_complete: false` and a `missing_assets` list.
 
 The frontend should not decide:
 
@@ -933,25 +944,23 @@ bind_actuator_primary
 
 The first configurator uses:
 
-```text
-1-gang GLB assets only (model supports 1ù4 gangs)
-switch or rotary dimmer per slot
+`	ext
+1-4 gang configuration in Assembly UI (only 1-gang GLBs registered today)
+module types: switch, dimmer, outlet, usb_c_outlet (any slot)
 finish schemes resolve materials via material_assignments
 separate GLB files for plate, screws, and module
 all parts positioned in Houdini
 all GLBs loaded at origin
 asset paths registered through asset_manifest.json
 material definitions stored separately from geometry
-replace_all material assignment initially
-semantic material bindings added when mixed materials are needed
+semantic material bindings (no replace_all)
+missing geometry soft-fails with missing_assets + placeholders
 no runtime positioning system
 no geometry database
 no manual GLB version suffixes
-admin-only Assignment States persist viewport assemblies
-legacy configurations table left unused
-```
-
----
+admin Save Current State persists geometry Assignment States
+legacy configurations table dropped on init
+`
 
 ## 22. Guiding Principles
 

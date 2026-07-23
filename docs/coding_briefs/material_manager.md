@@ -22,10 +22,10 @@ The Material Manager lives beside the existing configurator behind a top-level
 tab bar:
 
 ```text
-Assembly | Materials | Assignment States | Assignments
+Assembly | Materials | Assignments
 ```
 
-Read `docs/configurator.md` first. This brief extends that system and reuses its
+Read `docs/coding_briefs/configurator.md` first. This brief extends that system and reuses its
 stack, database, and architecture.
 
 ---
@@ -55,7 +55,7 @@ these parameters live from the database.
 
 # 3. Technical Stack
 
-Same stack as the configurator (see `docs/configurator.md` §4).
+Same stack as the configurator (see `docs/coding_briefs/configurator.md` §4).
 
 ```text
 Frontend:  React, TypeScript, Vite, Three.js, React Three Fiber, @react-three/drei
@@ -135,7 +135,7 @@ frontend/
 
 # 6. Data Model
 
-Reuses the existing `materials` table (see `docs/configurator.md` §8.1). No
+Reuses the existing `materials` table (see `docs/coding_briefs/configurator.md` §8.1). No
 schema change was required.
 
 ```text
@@ -212,7 +212,7 @@ The `Materials` tab uses a three-column master–detail layout.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Assembly | Materials | Assignment States | Assignments       │
+│ Assembly | Materials | Assignments                           │
 ├───────────────┬──────────────────────────┬───────────────────┤
 │ MATERIALS +New│ Code        [__________] │                   │
 │  ▪ Brass      │ Display name[__________] │                   │
@@ -343,7 +343,8 @@ invalid color or out-of-range parameter            (422)
 preview model (material_hero.glb) fails to load
 ```
 
-Errors and successes are shown as inline banners in the editor pane.
+Errors and successes are shown as banners overlaid at the bottom of the
+3D preview pane (same pattern as Assembly and Assignments).
 
 ---
 
@@ -399,7 +400,7 @@ Texture fields are stored but not yet consumed by `three/materials.ts`.
 
 The iteration is complete when:
 
-1. A `Materials` tab sits beside `Assembly`, `Assignment States`, and `Assignments` in the app shell.
+1. A `Materials` tab sits beside `Assembly` and `Assignments` in the app shell.
 2. The material list loads from `GET /api/materials` and shows all materials.
 3. A material can be created with a unique, sanitized code.
 4. A material's `code` and `display_name` can be renamed.

@@ -6,18 +6,46 @@ Build the first local web configurator for Latoun.
 
 This is an internal prototype, not a customer-facing website. Its primary purpose is to test the Latoun product model, database structure, geometry-loading workflow, material system, and assembly-resolution logic.
 
-The application must allow the user to configure a single 1-gang Latoun wall assembly by selecting:
+The **Assembly** tab defines a complete production assembly:
 
-- Device type:
-  - Switch
-  - Rotary dimmer
-- Finish scheme:
-  - Brass
-  - Steel
+```text
+Select plate gang count (1–4)
+        ↓
+Select one device per slot
+        ↓
+Select one finish for the complete assembly
+        ↓
+Build and preview the assembly
+        ↓
+Optionally Save Current State (admin) / Export JSON
+```
 
-The application must load the corresponding GLB assets, apply resolved semantic materials, display the assembled product, generate a simple BOM, and allow the active assembly to be exported as JSON.
+Supported devices (any device may occupy any slot):
 
-Multi-slot and multi-gang assemblies (1–4 gangs) are modeled in admin-only **Assignment States** (see the Assignments tab). The Assembly tab itself is an ad-hoc live preview only — it does not save or reload persisted assemblies.
+```text
+switch          → Switch
+dimmer          → Dimmer
+outlet          → Outlet
+usb_c_outlet    → USB-C Outlet
+```
+
+Supported finishes (customer-visible):
+
+```text
+brass → Brass
+steel → Steel
+```
+
+The public assembly is defined directly by current UI state
+(`gang_count` + per-slot modules + finish scheme). It does **not** depend on
+`assignment_states` while editing.
+
+Admin **Save Current State** persists the geometry into `assignment_states` /
+`assignment_state_modules` for the Assignments-tab viewport. State display names
+are geometry-only (e.g. `dimmer`, `switch-outlet`) — finish is not part of the name.
+
+Missing GLBs do not crash resolve: the API returns `missing_assets` warnings and
+the viewport shows neutral placeholders.
 
 Read the repository `README.md` before implementation. It contains the broader Latoun product model and long-term architecture.
 
@@ -34,7 +62,11 @@ The following GLB files already exist:
 1gang_slot01_switch.glb
 ```
 
-The configurator assembly consists of:
+Outlet and USB-C Outlet module types, and all 2–4 gang assets, may be selected
+in the UI before GLBs are authored. Unregistered keys are reported as asset
+warnings with placeholders — they are not substituted with another device.
+
+A 1-gang assembly with available geometry consists of:
 
 ```text
 1-gang assembly
@@ -65,26 +97,34 @@ All loaded assets must be added at the scene origin.
 
 # 3. MVP User Flow
 
-The application should open on one configurator page.
+The application opens on the Assembly tab.
 
 The user must be able to:
 
-1. Select `Switch` or `Rotary Dimmer`.
-2. Select a customer-visible finish scheme (`Brass`, `Steel`, …).
-3. See the 3D assembly update immediately.
-4. Rotate and zoom the product.
-5. See the resolved assembly data.
-6. See a basic generated BOM.
-7. Export the active assembly as JSON.
+1. Select plate gang count: `1`, `2`, `3`, or `4` (section **Plate Gangs**).
+2. Select one device per active slot via dropdown
+   (`Switch`, `Dimmer`, `Outlet`, `USB-C Outlet`).
+3. Select a customer-visible finish scheme (`Brass`, `Steel`).
+4. See the 3D assembly update immediately (placeholders when GLBs are missing).
+5. Rotate and zoom the product.
+6. See the resolved assembly summary (one row per slot).
+7. See a basic generated BOM.
+8. Export the active assembly as structured JSON (admin).
+9. Save Current State into Assignment States (admin).
 
-The Assembly tab does **not** save or reload assemblies. Admin-only **Assignment States** (Assignment States tab) persist multi-slot viewport assemblies for the Assignments tab.
-
-The default Assembly preview should be:
+Default Assembly preview:
 
 ```text
-Device: Rotary Dimmer
+Plate gangs: 1
+Slot 1: Dimmer
 Finish: Brass
 ```
+
+Error, warning, and success messages for Assembly overlay at the **bottom of
+the 3D viewport** (not in the side panel).
+
+Admin actions (`Save Current State`, `Export JSON`) are shown when
+`VITE_ADMIN_MODE` is unset or `true`, and hidden when `VITE_ADMIN_MODE=false`.
 
 ---
 
@@ -243,54 +283,42 @@ Example:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "assets": {
     "plate.1gang": {
       "asset_type": "plate",
       "file": "/assets/glb/1gang_plate.glb",
-      "coordinate_space": "assembly_origin",
-      "material_policy": "replace_all"
+      "coordinate_space": "assembly_origin"
     },
     "hardware.1gang.plate_screws": {
       "asset_type": "hardware",
       "file": "/assets/glb/1gang_plate_screws.glb",
-      "coordinate_space": "assembly_origin",
-      "material_policy": "replace_all"
+      "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.dimmer": {
       "asset_type": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_dimmer.glb",
-      "coordinate_space": "assembly_origin",
-      "material_policy": "replace_all"
+      "coordinate_space": "assembly_origin"
     },
     "module.1gang.slot01.switch": {
       "asset_type": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
       "file": "/assets/glb/1gang_slot01_switch.glb",
-      "coordinate_space": "assembly_origin",
-      "material_policy": "replace_all"
+      "coordinate_space": "assembly_origin"
     }
   }
 }
 ```
 
-For v0.1, `material_policy: "replace_all"` means that the frontend replaces every material found inside that GLB with the selected brass or steel material.
+The manifest is a geometry registry only. It does not store finish or material
+assignments. Materials resolve through finish schemes + semantic bindings on
+mesh material names.
 
-This is temporary but intentional. It avoids requiring semantic material bindings before the geometry pipeline is finalized.
-
-Later, `replace_all` can be replaced with named bindings such as:
-
-```text
-bind_plate_body
-bind_visible_screws
-bind_actuator_primary
-bind_core_visible
-```
-
-Do not build that more advanced system yet.
+Unregistered keys are soft-failed by the resolver (`missing_assets`); do not
+hardcode GLB paths elsewhere.
 
 ---
 
@@ -379,6 +407,8 @@ module_type_id
 code
 display_name
 is_active
+is_customer_visible
+sort_order
 ```
 
 Seed values:
@@ -388,15 +418,36 @@ Seed values:
   {
     "code": "switch",
     "display_name": "Switch",
-    "is_active": true
+    "is_active": true,
+    "is_customer_visible": true,
+    "sort_order": 10
   },
   {
     "code": "dimmer",
-    "display_name": "Rotary Dimmer",
-    "is_active": true
+    "display_name": "Dimmer",
+    "is_active": true,
+    "is_customer_visible": true,
+    "sort_order": 20
+  },
+  {
+    "code": "outlet",
+    "display_name": "Outlet",
+    "is_active": true,
+    "is_customer_visible": true,
+    "sort_order": 30
+  },
+  {
+    "code": "usb_c_outlet",
+    "display_name": "USB-C Outlet",
+    "is_active": true,
+    "is_customer_visible": true,
+    "sort_order": 40
   }
 ]
 ```
+
+`GET /api/catalog` returns only active, customer-visible module types, ordered by
+`sort_order`. Every active module type may occupy any slot (universal compatibility).
 
 ## 8.3 Assignment States
 
@@ -407,7 +458,13 @@ assignment_states
 assignment_state_modules
 ```
 
-These are admin-only viewport assembly definitions for the Assignments tab. They are **not** customer orders or saved Assembly-tab drafts.
+These are admin-only viewport assembly definitions for the Assignments tab.
+They store **geometry only** (gang count + per-slot modules). Display names are
+derived from module codes (e.g. `dimmer`, `switch-outlet`) and do **not** include
+finish.
+
+Public Assembly editing does not load or require an assignment state. Assignment
+States are written only when an admin clicks **Save Current State**.
 
 ### `assignment_states`
 
@@ -433,7 +490,7 @@ Example:
 ```json
 {
   "assignment_state_code": "LAT-ASG-000001",
-  "display_name": "1-Gang Dimmer",
+  "display_name": "dimmer",
   "gang_count": 1,
   "default_finish_scheme_id": 2,
   "notes": null,
@@ -470,11 +527,14 @@ Example child row:
 }
 ```
 
-The data model supports 1–4 gangs with one module per slot. Only 1-gang GLBs exist in `asset_manifest.json` today.
+The data model supports 1–4 gangs with one module per slot. Only 1-gang plate /
+screw / switch / dimmer GLBs exist in `asset_manifest.json` today; other
+combinations resolve with `missing_assets` warnings.
 
 ### Legacy `configurations` table
 
-The old `configurations` table is unused. Leave it in place if it already exists in a local database; do not migrate data into it and do not add new features on top of it.
+The old `configurations` table is unused and dropped on database init if present.
+Do not migrate data into it and do not add new features on top of it.
 
 ---
 
@@ -510,11 +570,20 @@ Use stable string codes in the API.
 
 The backend resolves the assembly and finish scheme into a render state.
 
-Example response:
+Configuration validity is independent of geometry availability:
+
+```text
+is_valid           → assembly/finish configuration is valid
+assets_complete    → every expected GLB key was found in the manifest
+missing_assets     → soft warnings for unregistered geometry (no HTTP error)
+```
+
+Example response (1-gang dimmer with complete assets):
 
 ```json
 {
   "is_valid": true,
+  "assets_complete": true,
   "assembly": {
     "gang_count": 1,
     "modules": [
@@ -547,17 +616,23 @@ Example response:
   "assets": [
     {
       "asset_key": "plate.1gang",
-      "file": "/assets/glb/1gang_plate.glb"
+      "file": "/assets/glb/1gang_plate.glb",
+      "role": "plate"
     },
     {
       "asset_key": "hardware.1gang.plate_screws",
-      "file": "/assets/glb/1gang_plate_screws.glb"
+      "file": "/assets/glb/1gang_plate_screws.glb",
+      "role": "plate_screws"
     },
     {
       "asset_key": "module.1gang.slot01.dimmer",
-      "file": "/assets/glb/1gang_slot01_dimmer.glb"
+      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "role": "module",
+      "slot_number": 1,
+      "module_type": "dimmer"
     }
   ],
+  "missing_assets": [],
   "bom": [
     {
       "component_code": "plate.1gang",
@@ -573,7 +648,7 @@ Example response:
     },
     {
       "component_code": "module.1gang.slot01.dimmer",
-      "display_name": "Rotary Dimmer Module",
+      "display_name": "Dimmer Module",
       "quantity": 1,
       "finish_scheme": "brass"
     }
@@ -644,10 +719,12 @@ Input:
 Output:
 
 ```text
-validation result
+validation result (is_valid)
+assets_complete
 resolved assembly
 resolved material assignments
-asset list
+asset list (with role / slot metadata)
+missing_assets warnings
 prototype BOM
 ```
 
@@ -675,25 +752,33 @@ Do not permanently save resolved asset paths or material parameters. Resolve the
 
 # 12. Frontend Layout
 
-Use a simple desktop layout with four top-level tabs:
+Use a simple desktop layout with three top-level tabs:
 
 ```text
-Assembly | Materials | Assignment States | Assignments
+Assembly | Materials | Assignments
 ```
+
+Assignment States are managed from the Assignments tab preview toolbar and from
+Assembly **Save Current State** — there is no separate Assignment States tab.
 
 The Assembly tab layout:
 
 ```text
 ┌──────────────────────────────────────────────┐
-│ Assembly | Materials | Assignment States | … │
+│ Assembly | Materials | Assignments           │
 ├──────────────────────────┬───────────────────┤
-│                          │ Device            │
-│                          │ [Dimmer] [Switch] │
+│                          │ Plate Gangs       │
+│                          │ [1][2][3][4]      │
 │      3D Preview          │                   │
+│                          │ Devices           │
+│   (alerts at bottom)     │ Slot 1 [dropdown] │
+│                          │ …                 │
 │                          │ Finish            │
 │                          │ [Brass] [Steel]   │
 │                          │                   │
-│                          │ Export JSON       │
+│                          │ Assembly summary  │
+│                          │ Admin Actions     │
+│                          │ Save / Export     │
 ├──────────────────────────┴───────────────────┤
 │ Prototype BOM                               │
 └──────────────────────────────────────────────┘
@@ -702,19 +787,20 @@ The Assembly tab layout:
 Required Assembly tab elements:
 
 ```text
-Latoun title
-tab bar: Assembly | Materials | Assignment States | Assignments
-3D viewport
-device selector
+tab bar: Assembly | Materials | Assignments
+3D viewport with bottom overlay for errors / warnings / success
+Plate Gangs selector (1–4 in one row)
+per-slot device dropdowns
 finish scheme selector
-assembly summary
+assembly summary (gang count, one row per slot, finish, state name)
 prototype BOM
-Export JSON button
+Save Current State (admin)
+Export JSON (admin)
 loading state
-error state
 ```
 
-The Assembly tab has no Save button and no saved-assembly list. Persisted viewport assemblies live in the Assignment States tab.
+Public assembly editing uses local UI state only. Persisted viewport assemblies
+for Assignments come from **Save Current State**.
 
 This is an internal application. Keep the UI clean but do not spend time creating a final luxury customer-facing design.
 
@@ -754,17 +840,19 @@ loadedAsset.scale.set(1, 1, 1);
 
 Do not create per-asset position tables.
 
-When `material_policy` is `replace_all`:
+When `material_policy` is present historically, ignore it — materials are applied
+per semantic binding (`mesh.material.name`) via finish scheme + `init` fallback.
 
 1. Traverse the loaded GLB scene.
-2. Find every `THREE.Mesh`.
-3. Replace all existing materials with the selected resolved material.
+2. Read each mesh's imported material name as a semantic binding.
+3. Resolve through `material_assignments` to a shared render material.
 4. Preserve the geometry and transforms.
-5. Clone materials only when necessary.
+5. Missing bindings render magenta and are reported in the viewport alerts.
 
 Dispose replaced materials and textures correctly when the assembly changes to avoid memory leaks.
 
-The asset loader should produce a clear error if a GLB cannot be found.
+Missing geometry (unregistered asset keys) uses a neutral placeholder — not the
+magenta missing-material shader. Those are separate error classes.
 
 ---
 
@@ -774,20 +862,26 @@ When the finish scheme changes:
 
 ```text
 Do not reload geometry if avoidable.
-Update semantic material assignments.
+Re-apply semantic material assignments to all loaded assets.
 Update the assembly summary.
 Update the prototype BOM.
 ```
 
-When the device type changes:
+When gang count changes:
 
 ```text
-Keep the plate loaded.
-Keep the screws loaded.
-Remove the previous slot module.
-Load the selected slot module.
-Apply the active finish scheme materials.
-Update the prototype BOM.
+Rebuild plate, screws, and all slot modules.
+Preserve existing slot selections when increasing.
+Remove inactive slots from the authoritative configuration when decreasing.
+Default new slots to switch.
+```
+
+When one slot's device changes:
+
+```text
+Replace only that slot's module geometry where practical.
+Do not silently substitute another device when the GLB is missing.
+Show a missing-geometry warning and placeholder instead.
 ```
 
 The active assembly should resolve automatically. A separate Validate button is not required for this limited MVP.
@@ -798,42 +892,44 @@ The active assembly should resolve automatically. A separate Validate button is 
 
 ## Export JSON
 
-Export a JSON file containing the active resolved assembly:
+Export a JSON file containing the structured assembly (geometry + finish).
+Optional debug sections are nested under `debug` when a render state is available:
 
 ```json
 {
+  "schema_version": 1,
   "gang_count": 1,
-  "modules": [
-    { "slot_number": 1, "module_type": "dimmer" }
+  "finish_scheme_code": "brass",
+  "slots": [
+    { "slot_number": 1, "module_type_code": "dimmer" }
   ],
-  "finish_scheme": "brass",
-  "assignment_state_code": null,
-  "assets": [
-    "plate.1gang",
-    "hardware.1gang.plate_screws",
-    "module.1gang.slot01.dimmer"
-  ],
-  "resolved_material_assignments": {
-    "primary_metal": "brass_brushed",
-    "hardware_metal": "brass_brushed",
-    "actuator_metal": "brass_brushed",
-    "electrical_core": "black_plastic_matte"
-  },
-  "prototype_bom": []
+  "state_name": "dimmer",
+  "debug": {
+    "assets": [
+      "plate.1gang",
+      "hardware.1gang.plate_screws",
+      "module.1gang.slot01.dimmer"
+    ],
+    "missing_assets": [],
+    "resolved_material_assignments": {
+      "primary_metal": "brass_brushed",
+      "hardware_metal": "brass_brushed",
+      "actuator_metal": "brass_brushed",
+      "electrical_core": "black_plastic_matte"
+    },
+    "prototype_bom": []
+  }
 }
 ```
 
-When the render state came from an Assignment State, use its code as the filename:
+Filename uses the geometry-only state name:
 
 ```text
-LAT-ASG-000001.json
+dimmer.json
+switch-outlet.json
 ```
 
-For ad-hoc Assembly-tab previews with no saved state:
-
-```text
-latoun_assembly_draft.json
-```
+Do not export `assignment_state_id`, Three.js objects, camera state, or GLB binary data.
 
 ---
 
@@ -845,20 +941,23 @@ The application must handle:
 backend unavailable
 database initialization failure
 missing asset manifest
-missing asset key
-missing GLB file
+missing asset key (soft warning via missing_assets — not a hard failure)
+missing GLB file at load time
 invalid module type
 invalid finish scheme code
 Three.js GLB loading failure
+missing semantic material assignments (magenta + viewport warning)
 ```
 
-Errors must be visible in the UI. Do not fail silently.
+Errors, warnings, and successes overlay at the **bottom of the 3D viewport**.
+Do not fail silently.
 
-Example:
+Example missing-geometry warning:
 
 ```text
-Could not load switch geometry:
-assets/glb/1gang_slot01_switch.glb
+Missing geometry
+• No GLB is registered for 2-gang plate.
+• No GLB is registered for 2-gang slot 1 switch.
 ```
 
 ---
@@ -1010,26 +1109,29 @@ Use stable filenames and overwrite exported files when geometry changes.
 Create backend tests for at least these cases:
 
 ```text
-1-gang dimmer + brass resolves successfully
-1-gang dimmer + steel resolves successfully
-1-gang switch + brass resolves successfully
-1-gang switch + steel resolves successfully
+1-gang dimmer/switch + brass/steel resolve successfully
+outlet and usb_c_outlet resolve as valid config with missing_assets when unregistered
+2–4 gang resolve returns is_valid with missing plate/screw/module warnings
 invalid finish scheme returns validation error
 invalid module type returns validation error
-missing asset key returns a clear error
-assignment state can be created, loaded, and resolved via render-state endpoint
+assignment state CRUD covers 1 / 2 / 4 slot module rows
+assignment state render-state endpoint resolves finish independently
 ```
+
+Frontend unit tests cover assembly configuration helpers (gang resize, slot
+changes, geometry-only state names, export payload shape) and semantic material
+application.
 
 Also verify manually:
 
 ```text
-all four assembly combinations render
-orbit controls work
-finish scheme updates are visible
-device switching replaces only the module
-BOM updates correctly
-JSON export works
-Assignment States CRUD works
+Plate Gangs 1–4 update slot selectors
+every device can occupy every slot
+finish updates materials without remounting geometry unnecessarily
+missing geometry shows viewport placeholders + bottom warning
+Save Current State writes assignment_states + modules
+Export JSON includes all active slots
+admin actions hide when VITE_ADMIN_MODE=false
 Assignments tab loads a saved state and resolves finish independently
 ```
 
@@ -1040,24 +1142,25 @@ Assignments tab loads a saved state and resolves finish independently
 Do not implement these in v0.1:
 
 ```text
-2-gang, 3-gang, or 4-gang GLB assets (model supports 1–4; only 1-gang GLBs exist today)
+authoring every 2–4 gang / outlet / USB-C GLB (UI + resolve already support missing)
 runtime module positioning
 transform database
-semantic GLB material bindings
 textures
 brushed-direction controls
 full manufacturing BOM
 real electrical core data
 pricing
 inventory
-orders
+orders / Add to Order
 authentication
 customer-facing branding
 cloud deployment
 asset versioning
 ```
 
-Admin-only Assignment States and the Assignments tab **are** implemented for internal viewport assembly testing.
+Admin Assignment States and the Assignments tab **are** implemented for internal
+viewport assembly testing. Public Assembly multi-slot configuration **is**
+implemented; Add to Order is deferred.
 
 ---
 
@@ -1068,16 +1171,18 @@ The iteration is complete when:
 1. `setup_local.bat` prepares the project on a Windows PC.
 2. `run_local.bat` launches the backend and frontend.
 3. The browser opens the local configurator.
-4. The plate and screws are always visible.
-5. The user can switch between dimmer and switch geometry.
-6. The user can switch between customer-visible finish schemes.
-7. All geometry loads at the origin without runtime positioning.
-8. Material parameters come from SQLite via finish-scheme resolution.
-9. GLB paths come from `asset_manifest.json`.
-10. The backend returns a resolved render state with an `assembly` object.
-11. A prototype BOM is displayed.
-12. The active assembly can be exported as JSON.
-13. Admin-only Assignment States can be created and resolved for the Assignments tab.
-14. No GLB paths or material parameters are hardcoded in React components.
+4. The user can select plate gangs 1–4 and one device per slot.
+5. Switch, Dimmer, Outlet, and USB-C Outlet are available in every slot.
+6. One finish applies to the complete assembly.
+7. Public assembly state comes from UI selections, not `assignment_states`.
+8. Missing GLBs produce warnings/placeholders instead of crashing resolve.
+9. Material parameters come from SQLite via finish-scheme resolution.
+10. GLB paths come from `asset_manifest.json`.
+11. The backend returns a resolved render state with `assembly`, `assets`, and `missing_assets`.
+12. A prototype BOM is displayed for available assets.
+13. Export JSON includes all active slots and a geometry-only `state_name`.
+14. Admin Save Current State writes Assignment States (geometry-only display names).
+15. Alerts appear at the bottom of the 3D viewport.
+16. No GLB paths or material parameters are hardcoded in React components.
 
 The purpose of this iteration is not visual perfection. It is to prove that the Latoun assembly, asset, material, database, and rendering layers work together cleanly.
