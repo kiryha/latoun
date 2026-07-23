@@ -2,8 +2,8 @@
 
 We bind a throwaway SQLite engine for each test and override the
 ``get_session`` dependency so route handlers use it. The real asset manifest at
-``config/asset_manifest.json`` is used (it is the default), so resolution
-exercises the true registry.
+``config/wall_plates/asset_manifest.json`` is used (it is the default), so
+resolution exercises the true registry.
 """
 
 from __future__ import annotations

@@ -38,7 +38,7 @@ describe("buildExportPayload", () => {
   it("keeps debug geometry/materials separated from the public payload", () => {
     const configuration = createDefaultConfiguration();
     const renderState = {
-      assets: [{ asset_key: "plate.1gang", file: "/assets/glb/1gang_plate.glb" }],
+      assets: [{ asset_key: "plate.1gang", file: "/assets/wall_plates/1gang_plate.glb" }],
       missing_assets: [],
       material_assignments: { primary_metal: "brass_brushed" },
       bom: [],

@@ -73,9 +73,9 @@ The default configuration is **Rotary Dimmer + Brass**.
 
 ```
 Product data        -> SQLite (materials, module_types, configurations)
-Geometry registry   -> config/asset_manifest.json (semantic key -> GLB path)
+Geometry registry   -> config/wall_plates/asset_manifest.json (semantic key -> GLB path)
 Render materials     -> SQLite materials table (MeshPhysicalMaterial params)
-Geometry files       -> frontend/public/assets/glb/*.glb
+Geometry files       -> frontend/public/assets/wall_plates/*.glb
 Resolved render state-> FastAPI backend (services/render_state_service.py)
 Rendering            -> React Three Fiber frontend
 ```
@@ -103,7 +103,7 @@ CORS origins, or the frontend API base URL. All values are optional.
   Start it with `run_local.bat`, or manually:
   `uvicorn app.main:app --port 8000 --reload` from `backend/` with the venv active.
 - **"Could not load geometry"** — a GLB file is missing from
-  `frontend/public/assets/glb/`. The expected files are `1gang_plate.glb`,
+  `frontend/public/assets/wall_plates/`. The expected files are `1gang_plate.glb`,
   `1gang_plate_screws.glb`, `1gang_slot01_dimmer.glb`, `1gang_slot01_switch.glb`.
 - **Database errors** — re-run the seed: from `backend/` with the venv active,
   `python -m app.seed`. The database is fully reproducible from the seed script.

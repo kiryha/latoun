@@ -6,7 +6,7 @@
 // Materials are applied per semantic binding using the resolved assignment map
 // and render-material definitions from the backend.
 
-export const HDRI_PATH = "/assets/hdri/historic_cloister_passage_1k.hdr";
+export const HDRI_PATH = "/hdri/historic_cloister_passage_1k.hdr";
 
 import {
   Component,

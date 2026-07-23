@@ -16,7 +16,7 @@ import type { Material } from "../types";
 import { createPhysicalMaterial } from "../three/materials";
 import { HDRI_PATH } from "../three/Scene";
 
-const HERO_PATH = "/assets/utils/material_hero.glb";
+const HERO_PATH = "/geo/material_hero.glb";
 
 function PreviewModel({ material }: { material: Material }) {
   const { scene } = useGLTF(HERO_PATH);

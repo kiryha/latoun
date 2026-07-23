@@ -25,11 +25,12 @@ class Settings:
     """Runtime settings for the Latoun configurator backend."""
 
     def __init__(self) -> None:
+        self.repository_root: Path = REPOSITORY_ROOT
         self.database_path: Path = _resolve_path(
             "LATOUN_DATABASE_PATH", "data/latoun.sqlite"
         )
         self.asset_manifest_path: Path = _resolve_path(
-            "LATOUN_ASSET_MANIFEST_PATH", "config/asset_manifest.json"
+            "LATOUN_ASSET_MANIFEST_PATH", "config/wall_plates/asset_manifest.json"
         )
         # Comma separated list of allowed CORS origins for the Vite dev server.
         raw_origins = os.environ.get(

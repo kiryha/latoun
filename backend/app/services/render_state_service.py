@@ -99,23 +99,24 @@ def _describe_missing_module(
 def _resolve_geometry(
     gang_count: int, normalized: list[tuple[int, str]]
 ) -> tuple[list[ResolvedAsset], list[MissingAssetWarning]]:
-    """Resolve plate, screws, and slot modules; soft-fail missing keys."""
+    """Resolve plate, screws, and slot modules via structured active lookup."""
     manifest = get_asset_manifest()
     assets: list[ResolvedAsset] = []
     missing: list[MissingAssetWarning] = []
 
-    plate_key = f"plate.{gang_count}gang"
-    plate_entry = manifest.try_get(plate_key)
-    if plate_entry is None:
+    plate_fallback_key = f"plate.{gang_count}gang"
+    plate_match = manifest.find_active(asset_type="plate", gang_count=gang_count)
+    if plate_match is None:
         missing.append(
             MissingAssetWarning(
-                asset_key=plate_key,
+                asset_key=plate_fallback_key,
                 role="plate",
                 gang_count=gang_count,
                 message=f"No GLB is registered for {gang_count}-gang plate.",
             )
         )
     else:
+        plate_key, plate_entry = plate_match
         assets.append(
             ResolvedAsset(
                 asset_key=plate_key,
@@ -124,18 +125,23 @@ def _resolve_geometry(
             )
         )
 
-    screws_key = f"hardware.{gang_count}gang.plate_screws"
-    screws_entry = manifest.try_get(screws_key)
-    if screws_entry is None:
+    screws_fallback_key = f"hardware.{gang_count}gang.plate_screws"
+    screws_match = manifest.find_active(
+        asset_type="hardware",
+        gang_count=gang_count,
+        hardware_type="plate_screws",
+    )
+    if screws_match is None:
         missing.append(
             MissingAssetWarning(
-                asset_key=screws_key,
+                asset_key=screws_fallback_key,
                 role="plate_screws",
                 gang_count=gang_count,
                 message=f"No GLB is registered for {gang_count}-gang plate screws.",
             )
         )
     else:
+        screws_key, screws_entry = screws_match
         assets.append(
             ResolvedAsset(
                 asset_key=screws_key,
@@ -145,12 +151,17 @@ def _resolve_geometry(
         )
 
     for slot_number, module_type_code in normalized:
-        asset_key = _module_asset_key(gang_count, slot_number, module_type_code)
-        entry = manifest.try_get(asset_key)
-        if entry is None:
+        fallback_key = _module_asset_key(gang_count, slot_number, module_type_code)
+        match = manifest.find_active(
+            asset_type="slot_module",
+            gang_count=gang_count,
+            slot_position=slot_number,
+            module_type=module_type_code,
+        )
+        if match is None:
             missing.append(
                 MissingAssetWarning(
-                    asset_key=asset_key,
+                    asset_key=fallback_key,
                     role="module",
                     gang_count=gang_count,
                     slot_number=slot_number,
@@ -163,6 +174,7 @@ def _resolve_geometry(
                 )
             )
             continue
+        asset_key, entry = match
         assets.append(
             ResolvedAsset(
                 asset_key=asset_key,

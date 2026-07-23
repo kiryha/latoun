@@ -1,12 +1,28 @@
 import { useState } from "react";
 import { AssignmentsManager } from "./assignments/AssignmentsManager";
 import { Configurator } from "./configurator/Configurator";
+import { GeometryTab } from "./geometry/GeometryTab";
 import { MaterialsManager } from "./materials/MaterialsManager";
 
-type Tab = "assembly" | "materials" | "assignments";
+type Tab = "assembly" | "geometry" | "materials" | "assignments";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("assembly");
+  const [geometryDirty, setGeometryDirty] = useState(false);
+
+  const requestTabChange = (next: Tab) => {
+    if (next === activeTab) return;
+    if (
+      activeTab === "geometry" &&
+      geometryDirty &&
+      !window.confirm(
+        "You have unsaved Geometry manifest changes. Leave this tab anyway?",
+      )
+    ) {
+      return;
+    }
+    setActiveTab(next);
+  };
 
   return (
     <div className="app">
@@ -17,16 +33,25 @@ export default function App() {
             role="tab"
             aria-selected={activeTab === "assembly"}
             className={`app-tab${activeTab === "assembly" ? " is-active" : ""}`}
-            onClick={() => setActiveTab("assembly")}
+            onClick={() => requestTabChange("assembly")}
           >
             Assembly
           </button>
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === "geometry"}
+            className={`app-tab${activeTab === "geometry" ? " is-active" : ""}`}
+            onClick={() => requestTabChange("geometry")}
+          >
+            Geometry
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === "materials"}
             className={`app-tab${activeTab === "materials" ? " is-active" : ""}`}
-            onClick={() => setActiveTab("materials")}
+            onClick={() => requestTabChange("materials")}
           >
             Materials
           </button>
@@ -35,7 +60,7 @@ export default function App() {
             role="tab"
             aria-selected={activeTab === "assignments"}
             className={`app-tab${activeTab === "assignments" ? " is-active" : ""}`}
-            onClick={() => setActiveTab("assignments")}
+            onClick={() => requestTabChange("assignments")}
           >
             Assignments
           </button>
@@ -44,6 +69,8 @@ export default function App() {
 
       {activeTab === "assembly" ? (
         <Configurator />
+      ) : activeTab === "geometry" ? (
+        <GeometryTab onDirtyChange={setGeometryDirty} />
       ) : activeTab === "materials" ? (
         <MaterialsManager />
       ) : (

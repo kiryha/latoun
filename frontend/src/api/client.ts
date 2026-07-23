@@ -2,6 +2,11 @@
 // backend; this module only transports semantic codes and resolved state.
 
 import type {
+  AssetManifestGetResponse,
+  AssetManifestSaveResponse,
+  ModuleTypeOption,
+} from "../geometry/types";
+import type {
   AssignmentState,
   AssignmentStateCreate,
   AssignmentStateUpdate,
@@ -200,6 +205,40 @@ export const api = {
     const suffix = query.toString() ? `?${query.toString()}` : "";
     return request<RenderState>(
       `/api/assignment-states/${id}/render-state${suffix}`,
+    );
+  },
+
+  listModuleTypes: () => request<ModuleTypeOption[]>("/api/module-types"),
+
+  getWallPlateAssetManifest: () =>
+    request<AssetManifestGetResponse>("/api/wall-plates/asset-manifest"),
+
+  saveWallPlateAssetManifest: (payload: {
+    manifest: { parts: Record<string, unknown> };
+    expected_revision: string | null;
+  }) =>
+    request<AssetManifestSaveResponse>("/api/wall-plates/asset-manifest", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  validateWallPlateAssetManifest: (manifest: {
+    parts: Record<string, unknown>;
+  }) =>
+    request<{
+      ok: boolean;
+      errors: { level: string; message: string; asset_key?: string | null }[];
+      warnings: { level: string; message: string; asset_key?: string | null }[];
+    }>("/api/wall-plates/asset-manifest/validate", {
+      method: "POST",
+      body: JSON.stringify({ manifest }),
+    }),
+
+  getWallPlateAssetFileStatus: (paths: string[]) => {
+    const query = new URLSearchParams();
+    for (const path of paths) query.append("path", path);
+    return request<{ files: Record<string, boolean> }>(
+      `/api/wall-plates/asset-file-status?${query.toString()}`,
     );
   },
 };

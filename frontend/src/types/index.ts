@@ -110,6 +110,7 @@ export interface ModuleType {
   display_name: string;
   is_active?: boolean;
   is_customer_visible?: boolean;
+  sort_order?: number;
 }
 
 export interface CatalogFinishScheme {

@@ -18,6 +18,7 @@ from .routes import (
     material_assignment_routes,
     material_routes,
     render_routes,
+    wall_plate_manifest_routes,
 )
 
 
@@ -56,6 +57,7 @@ app.include_router(assignment_state_routes.router)
 app.include_router(material_routes.router)
 app.include_router(finish_scheme_routes.router)
 app.include_router(material_assignment_routes.router)
+app.include_router(wall_plate_manifest_routes.router)
 
 
 @app.get("/")

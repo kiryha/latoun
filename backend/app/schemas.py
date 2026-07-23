@@ -170,6 +170,51 @@ class ModuleTypeOut(BaseModel):
     display_name: str
     is_active: bool = True
     is_customer_visible: bool = True
+    sort_order: int = 0
+
+
+# --------------------------------------------------------------------------- #
+# Wall-plate asset manifest (Geometry tab)
+# --------------------------------------------------------------------------- #
+class AssetManifestDocument(BaseModel):
+    parts: dict[str, dict]
+
+
+class AssetManifestGetOut(BaseModel):
+    manifest: AssetManifestDocument
+    revision: str
+
+
+class AssetManifestSaveRequest(BaseModel):
+    manifest: AssetManifestDocument
+    expected_revision: str | None = None
+
+
+class AssetManifestSaveOut(BaseModel):
+    manifest: AssetManifestDocument
+    revision: str
+    warnings: list[str] = Field(default_factory=list)
+    saved: bool = True
+
+
+class AssetManifestValidateRequest(BaseModel):
+    manifest: AssetManifestDocument
+
+
+class ManifestIssueOut(BaseModel):
+    level: str
+    message: str
+    asset_key: str | None = None
+
+
+class AssetManifestValidateOut(BaseModel):
+    ok: bool
+    errors: list[ManifestIssueOut] = Field(default_factory=list)
+    warnings: list[ManifestIssueOut] = Field(default_factory=list)
+
+
+class AssetFileStatusOut(BaseModel):
+    files: dict[str, bool]
 
 
 class CatalogFinishScheme(BaseModel):
