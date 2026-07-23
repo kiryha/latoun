@@ -10,11 +10,18 @@ not committed to Git. Seeding is idempotent (upsert by stable code / key).
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, engine, init_database
-from .models import FinishScheme, Material, MaterialAssignment, ModuleType
+from .models import (
+    AssignmentState,
+    AssignmentStateModule,
+    FinishScheme,
+    Material,
+    MaterialAssignment,
+    ModuleType,
+)
 
 # Render materials: implementation-level shader definitions referenced by
 # assignments. Values mirror docs/material_assignment.md.
@@ -90,7 +97,7 @@ FINISH_SCHEMES_SEED = [
     {
         "code": "init",
         "display_name": "Initialization",
-        "description": "Static material assignments shared by all configurations.",
+        "description": "Static material assignments shared by all assemblies.",
         "is_active": True,
         "is_customer_visible": False,
         "sort_order": 0,
@@ -136,7 +143,6 @@ ASSIGNMENTS_SEED = [
     ("black", "hardware_metal", "black_steel_brushed"),
     ("black", "actuator_metal", "black_steel_brushed"),
 ]
-
 
 def _upsert_materials(session: Session) -> None:
     for data in MATERIALS_SEED:
@@ -205,6 +211,12 @@ def _upsert_assignments(session: Session) -> None:
             existing.material_id = material.material_id
 
 
+def _clear_assignment_states(session: Session) -> None:
+    """Remove all Assembly States. They are created from the Assembly tab."""
+    session.execute(delete(AssignmentStateModule))
+    session.execute(delete(AssignmentState))
+
+
 def seed() -> None:
     init_database()
     with SessionLocal() as session:
@@ -212,12 +224,14 @@ def seed() -> None:
         _upsert_module_types(session)
         _upsert_finish_schemes(session)
         _upsert_assignments(session)
+        _clear_assignment_states(session)
         session.commit()
     print(f"Database initialized and seeded at: {engine.url.database}")
     print(f"  Render materials: {[m['code'] for m in MATERIALS_SEED]}")
     print(f"  Module types: {[m['code'] for m in MODULE_TYPES_SEED]}")
     print(f"  Finish schemes: {[f['code'] for f in FINISH_SCHEMES_SEED]}")
     print(f"  Assignments: {len(ASSIGNMENTS_SEED)}")
+    print("  Assembly states: cleared (save from Assembly tab)")
 
 
 if __name__ == "__main__":

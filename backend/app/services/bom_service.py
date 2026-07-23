@@ -7,9 +7,11 @@ components. The UI labels it clearly as a Prototype BOM.
 
 from __future__ import annotations
 
+import re
+
 from ..schemas import BomLine, ResolvedAsset
 
-# Human-readable names for the renderable components in the v0.1 assembly.
+# Human-readable names for known renderable components.
 COMPONENT_DISPLAY_NAMES: dict[str, str] = {
     "plate.1gang": "1-Gang Plate",
     "hardware.1gang.plate_screws": "1-Gang Plate Screw Set",
@@ -17,9 +19,27 @@ COMPONENT_DISPLAY_NAMES: dict[str, str] = {
     "module.1gang.slot01.switch": "Switch Module",
 }
 
+_MODULE_KEY_RE = re.compile(
+    r"^module\.(?P<gang>\d+)gang\.slot(?P<slot>\d+)\.(?P<module>.+)$"
+)
+
 
 def _display_name_for(asset_key: str) -> str:
-    return COMPONENT_DISPLAY_NAMES.get(asset_key, asset_key)
+    if asset_key in COMPONENT_DISPLAY_NAMES:
+        return COMPONENT_DISPLAY_NAMES[asset_key]
+
+    match = _MODULE_KEY_RE.match(asset_key)
+    if match:
+        module = match.group("module").replace("_", " ").title()
+        slot = int(match.group("slot"))
+        return f"{module} (Slot {slot})"
+
+    if asset_key.startswith("plate."):
+        return asset_key.replace(".", " ").replace("gang", "-Gang").title()
+    if "plate_screws" in asset_key:
+        return asset_key.replace(".", " ").replace("_", " ").title()
+
+    return asset_key
 
 
 def build_prototype_bom(

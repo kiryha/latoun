@@ -65,7 +65,9 @@ function Assembly({
 
   // Re-key the effect on the resolved asset/finish set so we re-measure when
   // the device or finish changes.
-  const signature = `${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`;
+  const signature = `${renderState.assembly.gang_count}:${renderState.assembly.modules
+    .map((module) => `${module.slot_number}:${module.module_type}`)
+    .join(",")}:${renderState.assembly.finish_scheme}`;
 
   useLayoutEffect(() => {
     if (!groupRef.current) return;
@@ -157,7 +159,9 @@ export function Scene({
   // Aggregate per-asset binding results into unions over the current asset set.
   const missingByAsset = useRef<Record<string, string[]>>({});
   const discoveredByAsset = useRef<Record<string, string[]>>({});
-  const resultEpoch = `${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`;
+  const resultEpoch = `${renderState.assembly.gang_count}:${renderState.assembly.modules
+    .map((module) => `${module.slot_number}:${module.module_type}`)
+    .join(",")}:${renderState.assembly.finish_scheme}`;
   const resultEpochRef = useRef(resultEpoch);
   if (resultEpochRef.current !== resultEpoch) {
     resultEpochRef.current = resultEpoch;
@@ -205,7 +209,9 @@ export function Scene({
       <Suspense fallback={<LoadingFallback />}>
         {/* Remounting on config change resets the error boundary cleanly. */}
         <R3FErrorBoundary
-          key={`${renderState.configuration.module_type}:${renderState.configuration.finish_scheme}`}
+          key={`${renderState.assembly.gang_count}:${renderState.assembly.finish_scheme}:${renderState.assembly.modules
+            .map((module) => `${module.slot_number}:${module.module_type}`)
+            .join(",")}`}
           onError={onAssetError}
         >
           {/* Sole light source: the equirectangular HDRI environment. */}

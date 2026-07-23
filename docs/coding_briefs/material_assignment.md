@@ -33,7 +33,8 @@ init + electrical_core → black_plastic_matte
 The implementation must include:
 
 - Database tables for finish schemes and semantic material assignments
-- A new internal `Assignments` tab
+- A new internal `Assignments` tab (finish-scheme bindings + assembly preview)
+- An admin-only `Assignment States` tab (persisted viewport assemblies)
 - Backend CRUD endpoints
 - Assignment resolution logic
 - Semantic material application in Three.js
@@ -51,6 +52,8 @@ The current internal application contains:
 ```text
 Assembly
 Materials
+Assignment States
+Assignments
 ```
 
 The `Assembly` tab allows the user to:
@@ -58,11 +61,12 @@ The `Assembly` tab allows the user to:
 - Select a device:
   - Rotary Dimmer
   - Switch
-- Select one render material
-- Preview the assembled product
-- Save a configuration
-- Export configuration JSON
+- Select a customer-visible finish scheme
+- Preview the assembled product live
+- Export the active assembly as JSON
 - View a prototype BOM
+
+The Assembly tab does **not** save or reload assemblies.
 
 The `Materials` tab allows internal users to:
 
@@ -71,6 +75,20 @@ The `Materials` tab allows internal users to:
 - Delete render materials
 - Enable or disable materials
 - Preview materials on test geometry
+
+The `Assignment States` tab is admin-only CRUD for persisted viewport assemblies:
+
+- Gang count (1–4; only 1-gang GLBs exist today)
+- One module type per slot
+- Default finish scheme for preview
+- Codes `LAT-ASG-######`
+
+The `Assignments` tab is an internal administration tool for finish-scheme material bindings and live assembly preview:
+
+- Edit finish schemes and semantic material assignments
+- Pick an Assignment State for geometry
+- Choose a finish scheme independently for materials
+- Select **None** to show the material hero preview instead of an assembly
 
 Existing render-material properties include:
 
@@ -394,7 +412,7 @@ Seed values:
   {
     "code": "init",
     "display_name": "Initialization",
-    "description": "Static material assignments shared by all configurations.",
+    "description": "Static material assignments shared by all assemblies.",
     "is_active": true,
     "is_customer_visible": false,
     "sort_order": 0
@@ -726,15 +744,17 @@ init < selected finish scheme
 
 ## 14. New `Assignments` Tab
 
-Add a third internal tab:
+The application has four top-level tabs:
 
 ```text
-Assembly | Materials | Assignments
+Assembly | Materials | Assignment States | Assignments
 ```
 
-The `Assignments` tab is an internal administration tool.
+The `Assignments` tab is an internal administration tool for finish-scheme material bindings and live preview.
 
-The future customer-facing configurator should not expose this tab.
+The `Assignment States` tab (admin-only) persists viewport assemblies used by the Assignments tab for geometry. See `docs/configurator.md` §8.3.
+
+The future customer-facing configurator should not expose the Assignment States or Assignments tabs.
 
 ### 14.1 Layout
 
@@ -742,7 +762,7 @@ Recommended desktop layout:
 
 ```text
 ┌───────────────────────────────────────────────────────────────────┐
-│ Assembly | Materials | Assignments                                │
+│ Assembly | Materials | Assignment States | Assignments            │
 ├───────────────────┬──────────────────────────────┬────────────────┤
 │ Finish Schemes    │ Scheme Properties            │ Preview        │
 │                   │                              │                │
@@ -805,7 +825,7 @@ The finish scheme code should be treated as a stable identifier.
 Changing the code should either:
 
 - Be blocked after creation, or
-- Require explicit confirmation because saved configurations may reference it
+- Require explicit confirmation because assignment states may reference it as `default_finish_scheme_id`
 
 Prefer making `code` read-only after creation for this iteration.
 
@@ -950,57 +970,41 @@ Do not build finish buttons from the `materials` table.
 
 A finish scheme can resolve multiple render materials.
 
-Saved configurations should store:
-
-```text
-finish_scheme_code
-```
-
-not:
-
-```text
-material_code
-```
-
-Example saved configuration:
-
-```json
-{
-  "configuration_code": "LAT-CFG-000003",
-  "gang_count": 1,
-  "module_type_code": "dimmer",
-  "finish_scheme_code": "brass"
-}
-```
-
-Add a migration for existing saved configurations if they currently store `material_code`.
-
-For existing data, map:
-
-```text
-brass → brass
-steel → steel
-copper → copper
-```
-
-Only migrate schemes that exist. Report unmapped values clearly.
+The Assembly tab resolves ad-hoc assemblies via `POST /api/render/resolve`. It does **not** persist finish scheme or geometry choices. Finish schemes still resolve materials through `material_assignments`.
 
 ---
 
 ## 17. Backend Render-State Changes
 
-The configuration resolver should return semantic assignments rather than one global material.
+The render resolver returns semantic assignments rather than one global material.
 
-Example:
+Ad-hoc Assembly resolve:
+
+```text
+POST /api/render/resolve
+```
+
+Saved Assignment State resolve:
+
+```text
+GET /api/assignment-states/{id}/render-state?finish_scheme=
+```
+
+Example response:
 
 ```json
 {
   "is_valid": true,
-  "configuration": {
+  "assembly": {
     "gang_count": 1,
-    "module_type": "dimmer",
-    "finish_scheme": "brass"
+    "modules": [
+      { "slot_number": 1, "module_type": "dimmer" }
+    ],
+    "finish_scheme": "brass",
+    "assignment_state_code": "LAT-ASG-000001",
+    "assignment_state_display_name": "1-Gang Dimmer"
   },
+  "active_sources": ["init", "brass"],
   "assets": [
     {
       "asset_key": "plate.1gang",
@@ -1044,7 +1048,7 @@ Example:
 }
 ```
 
-The asset list no longer needs a material policy.
+The render state uses `assembly`, not `configuration`. The asset list no longer needs a material policy.
 
 ---
 
@@ -1173,13 +1177,13 @@ Binding: electrical_core
 No assignment was found in Brass or Init.
 ```
 
-The configuration may still render, but its validation status must show a material-assignment error.
+The assembly may still render, but its validation status must show a material-assignment error.
 
 ---
 
 ## 20. Validation Service
 
-Add material validation to configuration resolution.
+Add material validation to assembly resolution.
 
 For all semantic names found in currently loaded assembly assets, verify that each resolves through:
 
@@ -1247,11 +1251,9 @@ Deleting an inactive, unreferenced material is allowed.
 Before deleting a finish scheme:
 
 - Block deletion of `init`
-- Warn if saved configurations reference the scheme
-- Either block deletion or require migration of those configurations
-- Delete the scheme’s assignment rows through cascade only after validation
+- Block deletion if any assignment state uses it as \default_finish_scheme_id- Delete the scheme’s assignment rows through cascade only after validation
 
-For this iteration, prefer blocking deletion when saved configurations reference the scheme.
+For this iteration, prefer blocking deletion when assignment states reference the scheme as their default finish.
 
 ---
 
@@ -1316,7 +1318,10 @@ Add:
 ```text
 finish_schemes
 material_assignments
+assignment_states
+assignment_state_modules
 Assignments tab
+Assignment States tab
 ```
 
 Keep existing rendering temporarily.
@@ -1357,7 +1362,7 @@ After all current assets use semantic names and tests pass:
 
 - Remove `material_policy` from the manifest
 - Remove `replace_all` application logic
-- Remove obsolete configuration fields based on direct material selection
+- Remove obsolete direct-material-selection fields from legacy code paths
 
 Do not preserve unused compatibility code indefinitely.
 
@@ -1377,24 +1382,26 @@ One resolver must drive:
 ```text
 Assembly preview
 Assignments preview
-saved configuration reload
+Assignment State render-state endpoint
 exported render state
 ```
 
 ---
 
-## 26. Exported Configuration JSON
+## 26. Exported Assembly JSON
 
-Update JSON export to store the finish scheme and resolved semantic mapping.
+Update JSON export to store the assembly and resolved semantic mapping.
 
 Example:
 
 ```json
 {
-  "configuration_code": "LAT-CFG-000003",
   "gang_count": 1,
-  "module_type": "dimmer",
+  "modules": [
+    { "slot_number": 1, "module_type": "dimmer" }
+  ],
   "finish_scheme": "brass",
+  "assignment_state_code": "LAT-ASG-000001",
   "assets": [
     "plate.1gang",
     "hardware.1gang.plate_screws",
@@ -1409,9 +1416,7 @@ Example:
 }
 ```
 
-The database should store the semantic configuration only.
-
-The exported file may include resolved assignments for debugging and reproducibility.
+The export is a snapshot for debugging and reproducibility. Persisted viewport assemblies live in Assignment States; the Assembly tab exports ad-hoc drafts without saving.
 
 ---
 
@@ -1426,6 +1431,7 @@ Create finish scheme
 Update finish scheme
 Delete unused finish scheme
 Block deletion of init
+Block deletion of finish scheme when assignment states reference it as default
 Block duplicate finish-scheme code
 Create assignment
 Update assignment
@@ -1459,7 +1465,7 @@ Missing binding warning is visible
 Meshes with material arrays resolve correctly
 ```
 
-### 27.3 Manual Test Configurations
+### 27.3 Manual Test Assemblies
 
 Test at least:
 
@@ -1477,8 +1483,8 @@ plate material changes
 screw material changes
 actuator material changes
 static electrical-core material remains unchanged
-saved configuration reloads correctly
-JSON export includes finish scheme
+Assignment State loads and resolves with independent finish scheme
+JSON export includes finish scheme and assembly modules
 ```
 
 ---
@@ -1546,7 +1552,7 @@ finish_scheme + binding_name → render_material
 
 The implementation is complete when:
 
-1. The application has an internal `Assignments` tab.
+1. The application has internal `Assignment States` and `Assignments` tabs.
 2. Finish schemes can be created, edited, enabled, disabled, and deleted under the defined rules.
 3. Semantic assignments can be created, edited, and removed.
 4. Assignments are stored in SQLite.
@@ -1562,10 +1568,12 @@ The implementation is complete when:
 14. Dynamic geometry materials resolve through the selected finish scheme.
 15. Missing assignments render in magenta and produce visible errors.
 16. Materials referenced by assignments cannot be deleted.
-17. Saved configurations store `finish_scheme_code`.
-18. Existing dimmer/switch and brass/steel configurations work.
-19. No material assignment logic is duplicated in the asset manifest.
-20. The existing global `replace_all` system is removed after migration.
+17. Finish scheme deletion is blocked when assignment states use it as default.
+18. Assignment States persist viewport assemblies for the Assignments tab.
+19. Render state uses `assembly`, resolved via `/api/render/resolve` or assignment-state render-state.
+20. Existing dimmer/switch and brass/steel assemblies work.
+21. No material assignment logic is duplicated in the asset manifest.
+22. The existing global `replace_all` system is removed after migration.
 
 ---
 

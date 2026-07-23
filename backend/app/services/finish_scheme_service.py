@@ -2,7 +2,7 @@
 
 Finish schemes are the customer-visible finish choices (brass, steel, …) plus
 the hidden internal ``init`` scheme. Deletion rules protect ``init`` and any
-scheme referenced by a saved configuration.
+scheme referenced as an assignment state's default finish.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..errors import ConflictError, NotFoundError
-from ..models import Configuration, FinishScheme
+from ..models import AssignmentState, FinishScheme
 from ..schemas import FinishSchemeCreate, FinishSchemeUpdate
 
 INIT_SCHEME_CODE = "init"
@@ -84,13 +84,14 @@ def delete_finish_scheme(session: Session, finish_scheme_id: int) -> FinishSchem
     if finish_scheme.code == INIT_SCHEME_CODE:
         raise ConflictError(
             "The 'init' scheme holds static assignments shared by all "
-            "configurations and cannot be deleted."
+            "assemblies and cannot be deleted."
         )
 
     reference_count = (
         session.scalar(
-            select(func.count(Configuration.configuration_id)).where(
-                Configuration.finish_scheme_code == finish_scheme.code
+            select(func.count(AssignmentState.assignment_state_id)).where(
+                AssignmentState.default_finish_scheme_id
+                == finish_scheme.finish_scheme_id
             )
         )
         or 0
@@ -98,7 +99,8 @@ def delete_finish_scheme(session: Session, finish_scheme_id: int) -> FinishSchem
     if reference_count > 0:
         raise ConflictError(
             f"Cannot delete finish scheme '{finish_scheme.code}': it is "
-            f"referenced by {reference_count} saved configuration(s)."
+            f"referenced by {reference_count} assembly state(s) as the "
+            "default finish."
         )
 
     # Assignment rows cascade-delete via the relationship / FK.

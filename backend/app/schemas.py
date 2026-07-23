@@ -165,6 +165,7 @@ class ResolvedAssignmentsOut(BaseModel):
 class ModuleTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    module_type_id: int
     code: str
     display_name: str
 
@@ -184,21 +185,83 @@ class CatalogOut(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Configuration request
+# Assignment states (admin viewport assemblies)
 # --------------------------------------------------------------------------- #
-class ConfigurationRequest(BaseModel):
-    gang_count: int = Field(default=1, ge=1)
-    module_type: str
-    finish_scheme: str
+class AssignmentStateModuleIn(BaseModel):
+    slot_number: int = Field(ge=1)
+    module_type_id: int
 
 
-# --------------------------------------------------------------------------- #
-# Resolved render state
-# --------------------------------------------------------------------------- #
-class ResolvedConfiguration(BaseModel):
+class AssignmentStateModuleOut(BaseModel):
+    assignment_state_module_id: int
+    slot_number: int
+    module_type_id: int
+    module_type_code: str
+    module_type_display_name: str
+
+
+class AssignmentStateCreate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=128)
+    gang_count: int = Field(ge=1)
+    default_finish_scheme_id: int | None = None
+    notes: str | None = Field(default=None, max_length=2048)
+    is_active: bool = True
+    sort_order: int = 0
+    modules: list[AssignmentStateModuleIn]
+
+
+class AssignmentStateUpdate(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=128)
+    gang_count: int | None = Field(default=None, ge=1)
+    default_finish_scheme_id: int | None = None
+    notes: str | None = Field(default=None, max_length=2048)
+    is_active: bool | None = None
+    sort_order: int | None = None
+    modules: list[AssignmentStateModuleIn] | None = None
+
+
+class AssignmentStateOut(BaseModel):
+    assignment_state_id: int
+    assignment_state_code: str
+    display_name: str
     gang_count: int
+    default_finish_scheme_id: int | None
+    default_finish_scheme_code: str | None
+    notes: str | None
+    is_active: bool
+    sort_order: int
+    modules: list[AssignmentStateModuleOut]
+    created_at: datetime
+    updated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Render resolve
+# --------------------------------------------------------------------------- #
+class RenderSlotModule(BaseModel):
+    slot_number: int = Field(ge=1)
     module_type: str
+
+
+class RenderResolveRequest(BaseModel):
+    """Ad-hoc assembly resolve for the Assembly tab (geometry + finish)."""
+
+    gang_count: int = Field(default=1, ge=1)
+    modules: list[RenderSlotModule]
     finish_scheme: str
+
+
+class ResolvedSlotModule(BaseModel):
+    slot_number: int
+    module_type: str
+
+
+class ResolvedAssembly(BaseModel):
+    gang_count: int
+    modules: list[ResolvedSlotModule]
+    finish_scheme: str
+    assignment_state_code: str | None = None
+    assignment_state_display_name: str | None = None
 
 
 class ResolvedAsset(BaseModel):
@@ -218,7 +281,7 @@ class BomLine(BaseModel):
 
 class RenderStateOut(BaseModel):
     is_valid: bool
-    configuration: ResolvedConfiguration
+    assembly: ResolvedAssembly
     active_sources: list[str]
     # binding_name -> render material code
     material_assignments: dict[str, str]
@@ -226,23 +289,3 @@ class RenderStateOut(BaseModel):
     materials: dict[str, MaterialOut]
     assets: list[ResolvedAsset]
     bom: list[BomLine]
-
-
-# --------------------------------------------------------------------------- #
-# Saved configurations
-# --------------------------------------------------------------------------- #
-class ConfigurationSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    configuration_id: int
-    configuration_code: str
-    gang_count: int
-    module_type_code: str
-    finish_scheme_code: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class ConfigurationDetail(BaseModel):
-    configuration: ConfigurationSummary
-    render_state: RenderStateOut

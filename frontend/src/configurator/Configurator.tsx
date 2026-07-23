@@ -1,26 +1,29 @@
-// Top-level configurator: owns selection state, talks to the backend, and
-// renders the 3D preview, option panel, summary, prototype BOM, and saved list.
-//
-// The customer-facing selector chooses a FINISH scheme (brass, steel, …). A
-// finish scheme resolves multiple render materials per semantic binding.
+// Assembly tab: live preview of a device + finish scheme.
+// "Save Current State" stores the assembly as an Assembly State for the
+// Assignments tab viewport.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { Banner } from "../components/Banner";
 import { BomPanel } from "../components/BomPanel";
-import { SavedConfigurations } from "../components/SavedConfigurations";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Scene } from "../three/Scene";
-import type {
-  Catalog,
-  ConfigurationSummary,
-  RenderState,
-} from "../types";
-import { downloadConfigurationJson } from "./exportConfiguration";
+import type { Catalog, RenderState, ResolvedSlotModule } from "../types";
+import { downloadAssemblyJson } from "./exportConfiguration";
 
 const DEFAULT_MODULE_TYPE = "dimmer";
 const DEFAULT_FINISH_SCHEME = "brass";
 const GANG_COUNT = 1;
+
+/** Build Assembly State display name from slot module type codes. */
+export function buildAssignmentStateDisplayName(
+  modules: ResolvedSlotModule[],
+): string {
+  return [...modules]
+    .sort((a, b) => a.slot_number - b.slot_number)
+    .map((module) => module.module_type)
+    .join("-");
+}
 
 export function Configurator() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -29,34 +32,17 @@ export function Configurator() {
 
   const [renderState, setRenderState] = useState<RenderState | null>(null);
   const [missingBindings, setMissingBindings] = useState<string[]>([]);
-  const [savedConfigurations, setSavedConfigurations] = useState<
-    ConfigurationSummary[]
-  >([]);
-  const [activeConfigCode, setActiveConfigCode] = useState<string | null>(null);
-  const [activeConfigId, setActiveConfigId] = useState<number | null>(null);
 
   const [isResolving, setIsResolving] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [isSavingState, setIsSavingState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const refreshSavedList = useCallback(async () => {
-    try {
-      const list = await api.listConfigurations();
-      setSavedConfigurations(list);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  // Initial load: catalog + saved configurations.
   useEffect(() => {
     (async () => {
       try {
         const loadedCatalog = await api.getCatalog();
         setCatalog(loadedCatalog);
-        // Default to the first customer-visible finish scheme if brass is absent.
         if (
           loadedCatalog.finish_schemes.length > 0 &&
           !loadedCatalog.finish_schemes.some(
@@ -72,11 +58,9 @@ export function Configurator() {
             : "Failed to load catalog from backend.",
         );
       }
-      await refreshSavedList();
     })();
-  }, [refreshSavedList]);
+  }, []);
 
-  // Resolve the configuration whenever the selection changes.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -84,9 +68,9 @@ export function Configurator() {
       setError(null);
       setMissingBindings([]);
       try {
-        const resolved = await api.resolveConfiguration({
+        const resolved = await api.resolveRender({
           gang_count: GANG_COUNT,
-          module_type: moduleType,
+          modules: [{ slot_number: 1, module_type: moduleType }],
           finish_scheme: finishScheme,
         });
         if (!cancelled) setRenderState(resolved);
@@ -102,91 +86,6 @@ export function Configurator() {
       cancelled = true;
     };
   }, [moduleType, finishScheme]);
-
-  const handleSelectModule = (code: string) => {
-    setModuleType(code);
-    // Selection now differs from any saved record -> treat as a draft.
-    setActiveConfigCode(null);
-    setActiveConfigId(null);
-    setSuccessMessage(null);
-  };
-
-  const handleSelectFinish = (code: string) => {
-    setFinishScheme(code);
-    setActiveConfigCode(null);
-    setActiveConfigId(null);
-    setSuccessMessage(null);
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const saved = await api.saveConfiguration({
-        gang_count: GANG_COUNT,
-        module_type: moduleType,
-        finish_scheme: finishScheme,
-      });
-      setActiveConfigCode(saved.configuration_code);
-      setActiveConfigId(saved.configuration_id);
-      setSuccessMessage(`Saved configuration ${saved.configuration_code}.`);
-      await refreshSavedList();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleLoad = async (configurationId: number) => {
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const detail = await api.getConfiguration(configurationId);
-      setModuleType(detail.configuration.module_type_code);
-      setFinishScheme(detail.configuration.finish_scheme_code);
-      setRenderState(detail.render_state);
-      setActiveConfigCode(detail.configuration.configuration_code);
-      setActiveConfigId(detail.configuration.configuration_id);
-      setSuccessMessage(
-        `Loaded configuration ${detail.configuration.configuration_code}.`,
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const handleDelete = async (configurationId: number) => {
-    const target = savedConfigurations.find(
-      (config) => config.configuration_id === configurationId,
-    );
-    const label = target?.configuration_code ?? `configuration ${configurationId}`;
-    if (!window.confirm(`Delete saved configuration ${label}?`)) {
-      return;
-    }
-    setDeletingId(configurationId);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      await api.deleteConfiguration(configurationId);
-      if (activeConfigId === configurationId) {
-        setActiveConfigCode(null);
-        setActiveConfigId(null);
-      }
-      setSuccessMessage(`Deleted ${label}.`);
-      await refreshSavedList();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleExport = () => {
-    if (!renderState) return;
-    downloadConfigurationJson(renderState, activeConfigCode);
-  };
 
   const handleMissingBindings = useCallback((bindings: string[]) => {
     setMissingBindings(bindings);
@@ -217,6 +116,81 @@ export function Configurator() {
     return scheme?.display_name ?? finishScheme;
   }, [catalog, finishScheme]);
 
+  const moduleDisplayName = useMemo(() => {
+    const module = catalog?.module_types.find((item) => item.code === moduleType);
+    return module?.display_name ?? moduleType;
+  }, [catalog, moduleType]);
+
+  const handleSaveCurrentState = async () => {
+    if (!renderState || !catalog) return;
+
+    const displayName = buildAssignmentStateDisplayName(
+      renderState.assembly.modules,
+    );
+    setIsSavingState(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const finishSchemes = await api.listFinishSchemes();
+      const finish = finishSchemes.find((scheme) => scheme.code === finishScheme);
+      if (!finish) {
+        throw new Error(`Finish scheme “${finishScheme}” was not found.`);
+      }
+
+      const modules = [...renderState.assembly.modules]
+        .sort((a, b) => a.slot_number - b.slot_number)
+        .map((slot) => {
+          const moduleTypeRow = catalog.module_types.find(
+            (item) => item.code === slot.module_type,
+          );
+          if (!moduleTypeRow) {
+            throw new Error(`Module type “${slot.module_type}” was not found.`);
+          }
+          return {
+            slot_number: slot.slot_number,
+            module_type_id: moduleTypeRow.module_type_id,
+          };
+        });
+
+      const existing = (await api.listAssignmentStates()).find(
+        (state) => state.display_name === displayName,
+      );
+
+      if (existing) {
+        const updated = await api.updateAssignmentState(
+          existing.assignment_state_id,
+          {
+            display_name: displayName,
+            gang_count: renderState.assembly.gang_count,
+            default_finish_scheme_id: finish.finish_scheme_id,
+            is_active: true,
+            modules,
+          },
+        );
+        setSuccessMessage(
+          `Updated assembly state “${updated.display_name}” (${updated.assignment_state_code}).`,
+        );
+      } else {
+        const created = await api.createAssignmentState({
+          display_name: displayName,
+          gang_count: renderState.assembly.gang_count,
+          default_finish_scheme_id: finish.finish_scheme_id,
+          is_active: true,
+          sort_order: 0,
+          modules,
+        });
+        setSuccessMessage(
+          `Saved assembly state “${created.display_name}” (${created.assignment_state_code}).`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsSavingState(false);
+    }
+  };
+
   return (
     <>
       <div className="app-body">
@@ -229,11 +203,11 @@ export function Configurator() {
             />
           ) : (
             <div className="viewport-message">
-              {error ? "Configuration unavailable." : "Loading configurator…"}
+              {error ? "Assembly unavailable." : "Loading configurator…"}
             </div>
           )}
           {isResolving && (
-            <div className="viewport-badge">Resolving configuration…</div>
+            <div className="viewport-badge">Resolving assembly…</div>
           )}
         </main>
 
@@ -254,9 +228,7 @@ export function Configurator() {
               <br />
               Finish scheme: {finishDisplayName}
               <br />
-              {missingBindings.length === 1
-                ? "Binding: "
-                : "Bindings: "}
+              {missingBindings.length === 1 ? "Binding: " : "Bindings: "}
               {missingBindings.map((b) => (b === "" ? "(empty)" : b)).join(", ")}
               <br />
               No assignment was found in {finishDisplayName} or Init. Affected
@@ -269,7 +241,7 @@ export function Configurator() {
             <SegmentedControl
               options={moduleOptions}
               value={moduleType}
-              onChange={handleSelectModule}
+              onChange={setModuleType}
               disabled={!catalog}
             />
           </section>
@@ -279,36 +251,36 @@ export function Configurator() {
             <SegmentedControl
               options={finishOptions}
               value={finishScheme}
-              onChange={handleSelectFinish}
+              onChange={setFinishScheme}
               disabled={!catalog}
             />
           </section>
 
           <section className="summary">
-            <h3>Configuration</h3>
+            <h3>Assembly</h3>
             {renderState ? (
               <dl>
                 <div>
-                  <dt>Code</dt>
-                  <dd className="mono">{activeConfigCode ?? "draft (unsaved)"}</dd>
-                </div>
-                <div>
                   <dt>Gang count</dt>
-                  <dd>{renderState.configuration.gang_count}</dd>
+                  <dd>{renderState.assembly.gang_count}</dd>
                 </div>
                 <div>
                   <dt>Device</dt>
-                  <dd className="capitalize">
-                    {renderState.configuration.module_type}
-                  </dd>
+                  <dd>{moduleDisplayName}</dd>
                 </div>
                 <div>
                   <dt>Finish</dt>
                   <dd>{finishDisplayName}</dd>
                 </div>
+                <div>
+                  <dt>State name</dt>
+                  <dd className="mono">
+                    {buildAssignmentStateDisplayName(renderState.assembly.modules)}
+                  </dd>
+                </div>
               </dl>
             ) : (
-              <p className="muted">No resolved configuration.</p>
+              <p className="muted">No resolved assembly.</p>
             )}
           </section>
 
@@ -316,28 +288,23 @@ export function Configurator() {
             <button
               type="button"
               className="button primary"
-              onClick={handleSave}
-              disabled={isSaving || !renderState}
+              onClick={() => void handleSaveCurrentState()}
+              disabled={!renderState || isSavingState}
             >
-              {isSaving ? "Saving…" : "Save Configuration"}
+              {isSavingState ? "Saving…" : "Save Current State"}
             </button>
             <button
               type="button"
               className="button"
-              onClick={handleExport}
+              onClick={() => {
+                if (!renderState) return;
+                downloadAssemblyJson(renderState);
+              }}
               disabled={!renderState}
             >
               Export JSON
             </button>
           </div>
-
-          <SavedConfigurations
-            configurations={savedConfigurations}
-            activeId={activeConfigId}
-            onLoad={handleLoad}
-            onDelete={handleDelete}
-            deletingId={deletingId}
-          />
         </aside>
       </div>
 

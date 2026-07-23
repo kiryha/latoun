@@ -2,72 +2,159 @@
 
 ## 1. Objective
 
-Update the Latoun configurator to replace the current user-facing **Save Configuration** workflow with an **Order** workflow.
+Update the Latoun configurator to support a customer-facing **Order** workflow.
 
-The new system must support:
+The implementation must allow:
 
 - One order containing multiple differently configured assemblies
-- Quantities for identical assemblies
-- Structured relational storage
-- No separate global `configurations` table
-- No large `configuration_json` blob as the primary order model
-- Browser-side draft order state
-- Database persistence only when the user submits an order
-- Historical price and BOM preservation
-- Future support for multi-gang products
+- Multiple quantities of the same assembly
+- Structured relational storage of submitted order items
+- Browser-local draft order state
+- Database persistence only when the customer submits an order
+- Historical price, label, and BOM snapshots
+- Future 1-, 2-, 3-, and 4-gang assemblies
+- Continued use of the existing admin-only `assignment_states` system
 
 Use this core architecture:
 
 ```text
-Order
-  └── Order Items
-        ├── structured product configuration
-        ├── quantity
-        ├── price snapshot
-        ├── selected modules
-        └── BOM snapshot
+Admin assignment system
+    assignment_states
+    assignment_state_modules
+    used only for viewport/debugging workflows
+
+Customer working assembly
+    temporary frontend state
+
+Draft order
+    browser localStorage
+
+Submitted order
+    orders
+    order_items
+    order_item_modules
+    order_item_bom
 ```
 
-Do not create one database configuration record for every assembly or every physical product.
+Do not create a separate global customer `configurations` table.
+
+Do not reuse `assignment_states` for orders.
 
 ---
 
-## 2. Current Behavior
+## 2. Read the Repository First
 
-The current Assembly tab includes functionality similar to:
+Before implementing:
 
-```text
-Save Configuration
-Export JSON
-Saved Configurations
-```
+1. Read the project README.
+2. Inspect the existing frontend architecture.
+3. Inspect the FastAPI application structure.
+4. Inspect current SQLAlchemy models and migrations.
+5. Inspect the existing `assignment_states` implementation.
+6. Inspect current Assembly and Assignments tabs.
+7. Inspect existing product, module, finish, material, asset, and BOM models.
+8. Follow existing naming, routing, validation, serialization, and testing conventions.
 
-A saved configuration represents the current product choices, such as:
-
-```text
-1-gang
-Rotary Dimmer
-Brass
-```
-
-This internal prototype behavior should be replaced with an order-oriented workflow.
-
-The configurator should still maintain one current working assembly in frontend state, but ordinary users should not save arbitrary configurations to the database.
+Do not redesign unrelated parts of the application.
 
 ---
 
-## 3. Target User Flow
+## 3. Existing Assignment-State System
 
-The main configurator flow should become:
+The previously used `configurations` admin system has already been replaced by:
+
+```text
+assignment_states
+assignment_state_modules
+```
+
+This system must remain intact.
+
+Assignment States are admin-only viewport presets used by the Assignments tab to determine which geometry to load.
+
+Examples:
+
+```text
+1-Gang Switch
+1-Gang Rotary Dimmer
+2-Gang Switch + Dimmer
+3-Gang Switch + Outlet + Dimmer
+```
+
+Assignment States are:
+
+- persistent
+- reusable
+- admin-only
+- used for material-assignment debugging
+- not customer saved configurations
+- not cart items
+- not order items
+- not priced
+- not commercial snapshots
+
+Do not modify their purpose as part of this task.
+
+---
+
+## 4. Separation of Concerns
+
+Keep these concepts strictly separate.
+
+### Assignment State
+
+Determines which geometry is loaded into the admin Assignments viewport.
+
+```text
+assignment_states
+assignment_state_modules
+```
+
+### Current Customer Assembly
+
+The assembly currently being configured by the customer.
+
+Stored in React state.
+
+### Draft Order
+
+A temporary collection of configured assemblies.
+
+Stored in browser `localStorage` for the first implementation.
+
+### Submitted Order
+
+Commercial data persisted in the database after explicit submission.
+
+Stored in:
+
+```text
+orders
+order_items
+order_item_modules
+order_item_bom
+```
+
+Do not reference `assignment_state_id` from an order item.
+
+An order item must store the customer's structured selections directly.
+
+---
+
+## 5. Target Customer Flow
+
+The public configurator flow should be:
 
 ```text
 Configure assembly
         ↓
 Add to Order
         ↓
-Review draft order
+Configure another assembly
         ↓
-Add another assembly or edit quantities
+Add to Order
+        ↓
+Review Order
         ↓
 Submit Order
 ```
@@ -75,104 +162,80 @@ Submit Order
 Example:
 
 ```text
-Configure:
-1-gang rotary dimmer, brass
-
-Click:
-Add to Order
-
-Configure:
-1-gang switch, steel
-
-Click:
-Add to Order
-
-Draft Order:
-2 × Brass Rotary Dimmer
-4 × Steel Switch
+2 × 1-Gang Brass Rotary Dimmer
+4 × 1-Gang Steel Switch
+1 × 2-Gang Brass Switch + Dimmer
 ```
 
-The configurator must support multiple unique assembly types within one order.
+This is one order containing three unique order items.
 
 ---
 
-## 4. Terminology
+## 6. Terminology
 
-Use these terms consistently.
+Use the following language consistently.
 
-### Current Configuration
+### Current Assembly
 
-The assembly currently being edited in the configurator.
+The product currently visible and editable in the configurator.
 
-It exists only in frontend state until added to the draft order.
+### Add to Order
 
-Example:
-
-```text
-gang count: 1
-slot 1: rotary dimmer
-finish scheme: brass
-```
+Copies the current structured assembly choices into the browser-local draft order.
 
 ### Draft Order
 
-A temporary collection of configured assemblies.
-
-For the first implementation, store the draft order in browser `localStorage`.
-
-Do not create a database order merely because the user opens the configurator or changes a product option.
+A browser-local list of unique configured assemblies and quantities.
 
 ### Order Item
 
-One unique configured assembly with a quantity.
-
-Example:
-
-```text
-1-gang rotary dimmer, brass
-quantity: 3
-```
-
-Three identical physical devices are represented by one order item with `quantity = 3`.
+One unique configured assembly multiplied by quantity.
 
 ### Submitted Order
 
-A persisted database order containing one or more order items.
+An immutable commercial record persisted in the database.
 
-After submission, its commercial snapshots must not change automatically when product definitions, materials, or pricing are updated.
+Do not call public order items “saved configurations.”
 
 ---
 
-## 5. Architectural Decisions
+## 7. Architectural Decisions
 
 Implement the following decisions.
 
-### Use structured order-item configuration
+### Use Structured Order-Item Configuration
 
-Use relational columns and child rows for the authoritative configuration.
+Store authoritative order configuration as relational columns and child rows.
 
-Do not use a large opaque `configuration_json` field as the primary model.
+Do not use one large opaque `configuration_json` blob as the primary model.
 
-### Do not create a global configurations table
+### No Global Customer Configuration Table
 
-Do not implement:
+Do not create:
 
 ```text
 configurations
-orders
-order_items
 ```
 
-where order items reference globally shared configuration records.
+for customer assemblies.
 
-Instead, store the product choices directly on each order item and its child records.
+Do not deduplicate customer configurations globally across orders.
 
-### Do not store one row per physical unit
+### Preserve Assignment States
+
+Do not remove, rename, or repurpose:
+
+```text
+assignment_states
+assignment_state_modules
+```
+
+### One Row per Unique Order Line
 
 For:
 
 ```text
-100 × identical brass rotary dimmers
+100 × identical brass dimmers
 ```
 
 store:
@@ -182,39 +245,39 @@ one order item
 quantity = 100
 ```
 
-### Persist only meaningful commercial actions
+Do not store one configuration or order-item row per physical device.
 
-No database writes are required when the user:
+### Explicit Persistence
 
-```text
-changes finish
-changes module type
-rotates the camera
-opens the configurator
-abandons the page
-```
+Do not write to the database when the customer merely:
 
-Create database records when the user submits an order.
+- opens the configurator
+- changes finish
+- changes module
+- changes gang count
+- rotates the camera
+- leaves the page
 
-### Store commercial snapshots
+Persist only when the customer submits the order.
 
-At order submission, preserve:
+### Backend Authority
 
-```text
-unit price
-line total
-product and option labels
-BOM
-configuration schema version
-```
+The backend must be authoritative for:
 
-Do not store temporary rendering details such as camera position or Three.js object state.
+- validation
+- product compatibility
+- pricing
+- totals
+- BOM generation
+- snapshot generation
+
+Do not trust frontend prices or totals.
 
 ---
 
-## 6. Recommended Database Model
+## 8. Recommended Database Model
 
-Add the following core tables:
+Create:
 
 ```text
 orders
@@ -223,51 +286,65 @@ order_item_modules
 order_item_bom
 ```
 
-Reuse existing tables where appropriate:
+Reuse existing entities where appropriate:
 
 ```text
-finish_schemes
+product_families
 module_types
-products or product_families
+finish_schemes
 parts
+assets
 materials
 ```
 
-Exact foreign-key names may be adjusted to match the existing repository.
+Adapt exact names to the repository.
 
 ---
 
-## 7. `orders` Table
+## 9. `orders` Table
 
-The `orders` table represents the complete customer order.
+The `orders` table represents the complete submitted customer order.
 
 Recommended fields:
 
 ```text
 order_id
 order_number
+idempotency_key
 status
+
 customer_name
 customer_email
 customer_phone
+
 shipping_address_line_1
 shipping_address_line_2
 shipping_city
 shipping_state
 shipping_postal_code
 shipping_country
+
 currency
 subtotal
-tax
+tax_amount
 shipping_amount
 total
+
 notes
+
 created_at
 updated_at
 submitted_at
 ```
 
-Possible statuses:
+Recommended constraints:
+
+```text
+order_number UNIQUE
+idempotency_key UNIQUE
+```
+
+Recommended initial statuses:
 
 ```text
 submitted
@@ -280,42 +357,54 @@ completed
 cancelled
 ```
 
-Do not create database orders with an `abandoned` status for every visitor in the initial implementation.
+Do not create abandoned database orders for visitors in this implementation.
 
-The order should be created when the customer explicitly submits it.
+---
 
-### Order Number
+## 10. Public Order Number
 
-Generate a human-readable order number, for example:
+Use a public human-readable order number separate from the database primary key.
+
+Example:
 
 ```text
 LAT-ORD-000001
 ```
 
-The database primary key and public order number should be separate fields.
+Do not expose internal database IDs in public URLs or confirmation messages.
+
+Order-number generation must be safe under concurrent requests.
+
+Follow the project's existing sequence or numbering convention if one exists.
 
 ---
 
-## 8. `order_items` Table
+## 11. `order_items` Table
 
-Each row represents one unique configured assembly in an order.
+Each order-item row represents one unique configured assembly in an order.
 
 Recommended fields:
 
 ```text
 order_item_id
 order_id
+
 product_family_id
 gang_count
 finish_scheme_id
 quantity
+
+configuration_version
+configuration_hash
+
 unit_price
 line_total
-configuration_version
+
 product_code_snapshot
 product_name_snapshot
 finish_scheme_code_snapshot
 finish_scheme_name_snapshot
+
 created_at
 updated_at
 ```
@@ -323,29 +412,38 @@ updated_at
 Foreign keys:
 
 ```text
-order_id → orders.order_id
-finish_scheme_id → finish_schemes.finish_scheme_id
-product_family_id → product_families.product_family_id
+order_id
+    → orders.order_id
+
+product_family_id
+    → product_families.product_family_id
+
+finish_scheme_id
+    → finish_schemes.finish_scheme_id
 ```
 
-Use the existing product table if one already exists.
+Do not add:
 
-Required rules:
+```text
+assignment_state_id
+```
+
+An order item must not depend on an admin Assignment State.
+
+Recommended constraints:
 
 ```text
 quantity >= 1
 gang_count >= 1
 unit_price >= 0
-line_total = unit_price × quantity
+line_total >= 0
 ```
-
-Do not rely only on frontend calculations. Recalculate monetary totals on the backend.
 
 ---
 
-## 9. `order_item_modules` Table
+## 12. `order_item_modules` Table
 
-This table stores slot-by-slot module choices.
+Store the module selected for each physical slot.
 
 Recommended fields:
 
@@ -357,50 +455,68 @@ module_type_id
 module_code_snapshot
 module_name_snapshot
 created_at
+updated_at
 ```
 
 Foreign keys:
 
 ```text
-order_item_id → order_items.order_item_id
-module_type_id → module_types.module_type_id
+order_item_id
+    → order_items.order_item_id
+
+module_type_id
+    → module_types.module_type_id
 ```
 
-Required uniqueness constraint:
+Required unique constraint:
 
 ```text
 UNIQUE(order_item_id, slot_number)
 ```
 
-Example for one-gang:
+Examples follow.
+
+### One-Gang Dimmer
 
 ```text
-order item:
+order_item:
 gang_count = 1
 
-module row:
-slot_number = 1
-module_type = rotary_dimmer
+module:
+slot 1 → rotary_dimmer
 ```
 
-Example for two-gang:
+### Two-Gang Switch + Dimmer
 
 ```text
-order item:
+order_item:
 gang_count = 2
 
-module rows:
+modules:
 slot 1 → switch
 slot 2 → rotary_dimmer
 ```
 
-This structure must support future multi-gang configurations without redesigning the order schema.
+### Four-Gang Mixed Assembly
+
+```text
+order_item:
+gang_count = 4
+
+modules:
+slot 1 → switch
+slot 2 → switch
+slot 3 → outlet
+slot 4 → usb_c_outlet
+```
+
+This must support future module types without database schema changes.
 
 ---
 
-## 10. `order_item_bom` Table
+## 13. `order_item_bom` Table
 
-When the order is submitted, store an immutable BOM snapshot for each order item.
+At submission, store an immutable BOM snapshot for every order item.
 
 Recommended fields:
 
@@ -408,99 +524,200 @@ Recommended fields:
 order_item_bom_id
 order_item_id
 part_id
+
 part_code_snapshot
 part_name_snapshot
+
 quantity_per_assembly
 assembly_quantity
 total_quantity
+
 unit_cost_snapshot
+
 created_at
 ```
 
 Foreign key:
 
 ```text
-order_item_id → order_items.order_item_id
+order_item_id
+    → order_items.order_item_id
 ```
+
+`part_id` may be nullable if historical rows must remain valid after a live part is archived or removed.
 
 Example:
 
 ```text
 Order item:
-3 × 1-gang brass rotary dimmer
+3 × 2-Gang Brass Switch + Dimmer
+```
 
-BOM:
-plate_1gang
+Possible BOM rows:
+
+```text
+2-gang plate:
 quantity_per_assembly = 1
 assembly_quantity = 3
 total_quantity = 3
 
-screw_set_1gang
+2-gang screw set:
 quantity_per_assembly = 1
 assembly_quantity = 3
 total_quantity = 3
 
-rotary_dimmer_module
+switch module:
+quantity_per_assembly = 1
+assembly_quantity = 3
+total_quantity = 3
+
+dimmer module:
 quantity_per_assembly = 1
 assembly_quantity = 3
 total_quantity = 3
 ```
 
-The BOM snapshot should preserve what manufacturing expected when the order was submitted.
-
-Do not resolve historical orders against the current live BOM later.
+Historical orders must not regenerate their BOM from current product rules.
 
 ---
 
-## 11. Optional Audit Snapshot
+## 14. Optional Compact Audit Snapshot
 
-A small JSON snapshot may be stored for auditing or human-readable export, but it must not be the authoritative configuration model.
+A small optional JSON snapshot may be stored for audit or export convenience.
 
-Optional field:
+Example field:
 
 ```text
 configuration_snapshot_json
 ```
 
-Example content:
+Example value:
 
 ```json
 {
   "schema_version": 1,
-  "gang_count": 1,
+  "product_family": {
+    "code": "electrical_device",
+    "name": "Electrical Device"
+  },
+  "gang_count": 2,
   "finish_scheme": {
     "code": "brass",
-    "display_name": "Brass"
+    "name": "Brass"
   },
   "modules": [
     {
-      "slot": 1,
+      "slot_number": 1,
+      "code": "switch",
+      "name": "Switch"
+    },
+    {
+      "slot_number": 2,
       "code": "rotary_dimmer",
-      "display_name": "Rotary Dimmer"
+      "name": "Rotary Dimmer"
     }
   ]
 }
 ```
 
+This JSON must not replace the structured relational fields.
+
 Do not store:
 
-```text
-GLB object trees
-Three.js material instances
-camera state
-UI state
-temporary validation messages
-full render state
-shader source
-```
-
-The structured database fields remain authoritative.
+- GLB object trees
+- Three.js object state
+- camera state
+- viewport controls
+- temporary UI state
+- material instances
+- shader source
+- admin assignment-state IDs
 
 ---
 
-## 12. Draft Order Storage
+## 15. Configuration Version
 
-For the first public implementation, keep the draft order in browser `localStorage`.
+Store a configuration schema version on each submitted order item.
+
+Initial value:
+
+```text
+configuration_version = 1
+```
+
+Increment this only when the meaning or structure of submitted order-item selections changes incompatibly.
+
+Do not use the version for ordinary product-data edits.
+
+---
+
+## 16. Configuration Hash
+
+Generate a canonical hash for each unique structured assembly.
+
+The hash is useful for:
+
+- merging identical draft lines
+- detecting duplicates
+- diagnostics
+- administrative grouping
+
+The canonical representation should include:
+
+```text
+product family code
+gang count
+finish scheme code
+module type code for every slot
+```
+
+It must exclude:
+
+```text
+quantity
+price
+timestamps
+display names
+frontend IDs
+camera state
+assignment-state data
+```
+
+Example canonical structure:
+
+```json
+{
+  "product_family_code": "electrical_device",
+  "gang_count": 2,
+  "finish_scheme_code": "brass",
+  "modules": [
+    {
+      "slot_number": 1,
+      "module_type_code": "switch"
+    },
+    {
+      "slot_number": 2,
+      "module_type_code": "rotary_dimmer"
+    }
+  ]
+}
+```
+
+Canonicalization rules:
+
+1. Normalize codes consistently.
+2. Sort object keys consistently.
+3. Sort modules by `slot_number`.
+4. Serialize deterministically.
+5. Generate SHA-256.
+
+The backend must recalculate the hash and must not trust a client-provided hash.
+
+---
+
+## 17. Draft Order Storage
+
+For the initial implementation, keep the draft order in browser `localStorage`.
 
 Recommended key:
 
@@ -508,7 +725,7 @@ Recommended key:
 latoun_draft_order_v1
 ```
 
-Suggested frontend shape:
+Suggested TypeScript structure:
 
 ```typescript
 interface DraftOrder {
@@ -520,12 +737,17 @@ interface DraftOrder {
 interface DraftOrderItem {
   localId: string;
   configurationHash: string;
+
   productFamilyCode: string;
   gangCount: number;
   finishSchemeCode: string;
+
   modules: DraftOrderModule[];
+
   quantity: number;
+
   estimatedUnitPrice: number | null;
+  estimatedLineTotal: number | null;
 }
 
 interface DraftOrderModule {
@@ -534,91 +756,78 @@ interface DraftOrderModule {
 }
 ```
 
-The backend must not trust browser prices during submission.
+Draft state must survive browser refresh.
 
-Draft order data should survive page refreshes.
-
-Provide a clear action to:
-
-```text
-Clear Order
-```
+Do not save draft order items to the database.
 
 ---
 
-## 13. Configuration Identity and Duplicate Merging
+## 18. Draft Schema Validation
 
-When a user adds the same configured assembly more than once, increase its quantity instead of creating duplicate draft lines.
+When reading from `localStorage`:
 
-Create a canonical configuration representation.
+1. Parse safely.
+2. Validate the schema version.
+3. Validate required fields.
+4. Validate positive quantities.
+5. Validate slot structure.
+6. Reject malformed entries.
+7. Preserve valid entries where practical.
+8. Show a user-friendly warning if draft data cannot be recovered.
 
-Example:
-
-```json
-{
-  "product_family_code": "electrical_device",
-  "gang_count": 1,
-  "finish_scheme_code": "brass",
-  "modules": [
-    {
-      "slot_number": 1,
-      "module_type_code": "rotary_dimmer"
-    }
-  ]
-}
-```
-
-Canonicalization rules:
-
-```text
-sort object keys consistently
-sort modules by slot_number
-normalize codes
-exclude quantity
-exclude price
-exclude timestamps
-exclude frontend-only fields
-```
-
-Generate:
-
-```text
-configuration_hash = SHA-256(canonical representation)
-```
-
-When adding to the draft order:
-
-```text
-same configuration_hash
-→ increase quantity
-
-different configuration_hash
-→ add a new order item
-```
-
-The hash is for matching and convenience, not security.
+Do not allow malformed local data to crash the configurator.
 
 ---
 
-## 14. Assembly Tab Changes
+## 19. Add to Order
 
-Remove or hide these user-facing controls:
+Replace the customer-facing action:
 
 ```text
 Save Configuration
-Saved Configurations
 ```
 
-Replace the primary action with:
+with:
 
 ```text
 Add to Order
 ```
 
-Recommended Assembly tab structure:
+When clicked:
+
+1. Validate the current assembly locally.
+2. Create the canonical customer configuration.
+3. Generate the draft configuration hash.
+4. Search the current draft order for the same hash.
+5. If found, increase its quantity.
+6. Otherwise add a new draft line.
+7. Save the updated draft to `localStorage`.
+8. Show a confirmation message.
+
+Example:
 
 ```text
-Product options
+Added to Order
+
+2-Gang Brass Switch + Rotary Dimmer
+Quantity in order: 2
+```
+
+Adding the assembly must copy the current selections.
+
+Later changes to the current viewport assembly must not mutate the added order line.
+
+---
+
+## 20. Assembly Tab Changes
+
+The public Assembly tab should include:
+
+```text
+Product family
+Gang count
+Module selection for each slot
+Finish
 3D preview
 Configuration summary
 Estimated price
@@ -626,108 +835,162 @@ Add to Order
 View Order
 ```
 
-After adding:
+Remove customer-facing:
 
 ```text
-Added to Order
-
-1-gang Brass Rotary Dimmer
-Quantity in order: 2
+Save Configuration
+Saved Configurations
 ```
 
-The current working configuration should remain editable after adding.
+Do not remove or modify the admin `assignment_states` UI.
 
-Adding to the order must copy the current semantic choices into the draft-order state. Later changes to the current assembly must not mutate an existing order item unless the user explicitly edits that order item.
+The public Assembly tab must not load or save Assignment States.
 
 ---
 
-## 15. Order Review UI
+## 21. Assignment Tab Must Remain Independent
 
-Add an Order or Cart view.
+The admin Assignments tab continues to use:
 
-Recommended route:
+```text
+Assignment State
+Preview Finish Scheme
+```
+
+Assignment State determines geometry.
+
+Finish Scheme determines semantic material resolution.
+
+The order implementation must not alter this behavior.
+
+Do not make the public order system depend on the currently selected Assignment State.
+
+---
+
+## 22. Order Review UI
+
+Add a customer-facing Order view.
+
+Suggested route:
 
 ```text
 /order
 ```
 
-or:
+Display one row or card for each unique draft-order item.
+
+Required information:
 
 ```text
-/cart
+assembly type
+gang count
+finish
+slot modules
+quantity
+estimated unit price
+estimated line total
 ```
 
-Use the user-facing label:
-
-```text
-Order
-```
-
-The page should display each unique configured assembly.
-
-Example:
-
-| Assembly | Finish | Modules | Quantity | Unit Price | Total |
-|---|---|---|---:|---:|---:|
-| 1-gang | Brass | Rotary Dimmer | 2 | $285 | $570 |
-| 1-gang | Steel | Switch | 4 | $240 | $960 |
-
-Required controls:
+Required actions:
 
 ```text
 increase quantity
 decrease quantity
 enter quantity
+edit assembly
 remove item
-edit configuration
 clear order
 submit order
 ```
 
-When quantity reaches zero, remove the line after confirmation or treat zero as removal.
+Example table:
+
+| Assembly | Finish | Modules | Quantity | Unit Price | Total |
+|---|---|---|---:|---:|---:|
+| 1-Gang | Brass | Rotary Dimmer | 2 | $285.00 | $570.00 |
+| 2-Gang | Steel | Switch + Outlet | 1 | $420.00 | $420.00 |
+
+Frontend prices are estimates only.
+
+Clearly label them as estimated until the backend confirms the order.
 
 ---
 
-## 16. Editing an Order Item
+## 23. Editing a Draft Order Item
 
-When the user selects:
+When the user selects `Edit`:
 
-```text
-Edit
-```
-
-load that order item's configuration into the Assembly tab.
-
-Maintain an edit context, for example:
+1. Load that draft line into the public Assembly tab.
+2. Store an editing context such as:
 
 ```text
 editingDraftOrderItemId
 ```
 
-The primary action changes from:
-
-```text
-Add to Order
-```
-
-to:
+3. Change the primary action to:
 
 ```text
 Update Order Item
 ```
 
-When saved:
+4. On update, recalculate the canonical configuration and hash.
+5. If the updated configuration matches another draft line, merge quantities.
+6. Otherwise replace the edited line.
+7. Preserve the quantity unless the user changes it explicitly.
+8. Return to the Order page or show clear confirmation.
 
-1. Recalculate the canonical configuration hash.
-2. If it matches another existing line, merge quantities.
-3. Otherwise update the selected line.
-4. Return to the Order page or show confirmation.
-
-Do not silently edit another line with the same configuration.
+Do not use an Assignment State to edit an order item.
 
 ---
 
-## 17. Submit Order API
+## 24. Removing and Clearing Draft Items
+
+Support:
+
+```text
+Remove Item
+Clear Order
+```
+
+Recommended behavior:
+
+- Decreasing quantity from 1 should not silently produce zero.
+- Confirm removal or provide an explicit remove action.
+- Confirm `Clear Order`.
+- Persist every successful change to `localStorage`.
+
+---
+
+## 25. Submit Order Form
+
+Collect at least:
+
+```text
+customer name
+customer email
+customer phone, optional
+shipping address
+customer notes, optional
+```
+
+The initial implementation may use a single US shipping address.
+
+Recommended fields:
+
+```text
+address line 1
+address line 2
+city
+state
+postal code
+country
+```
+
+Do not implement payment processing unless already present and explicitly in scope.
+
+---
+
+## 26. Submit Order API
 
 Add an endpoint such as:
 
@@ -739,6 +1002,7 @@ Example request:
 
 ```json
 {
+  "idempotency_key": "03f5e58e-668c-4bb5-a6e6-8d150e26c6ce",
   "customer": {
     "name": "John Smith",
     "email": "john@example.com",
@@ -768,13 +1032,17 @@ Example request:
     },
     {
       "product_family_code": "electrical_device",
-      "gang_count": 1,
+      "gang_count": 2,
       "finish_scheme_code": "steel",
-      "quantity": 4,
+      "quantity": 1,
       "modules": [
         {
           "slot_number": 1,
           "module_type_code": "switch"
+        },
+        {
+          "slot_number": 2,
+          "module_type_code": "outlet"
         }
       ]
     }
@@ -782,153 +1050,247 @@ Example request:
 }
 ```
 
-The client must not send authoritative totals.
-
-The backend must resolve and calculate:
+The request must not contain authoritative:
 
 ```text
-product validity
-module validity
-finish validity
-compatibility
-unit price
-line total
+unit_price
+line_total
 subtotal
 tax
 shipping
 total
 BOM
-display-name snapshots
-product-code snapshots
 ```
+
+The backend calculates those values.
 
 ---
 
-## 18. Order Submission Transaction
+## 27. Backend Submission Workflow
 
-Create the order in one database transaction.
+Create the complete submitted order in one transaction.
 
 Required sequence:
 
 ```text
-1. Validate customer and address data.
-2. Validate that at least one item exists.
-3. Validate each structured configuration.
-4. Resolve live product entities.
-5. Resolve current pricing.
-6. Resolve current BOM.
-7. Create the order row.
-8. Create order-item rows.
-9. Create order-item-module rows.
-10. Create order-item-BOM rows.
-11. Calculate and save totals.
-12. Commit the transaction.
+1. Validate request structure.
+2. Validate customer data.
+3. Validate shipping data.
+4. Require at least one item.
+5. Validate each product family.
+6. Validate gang count.
+7. Validate each finish scheme.
+8. Validate every module and slot.
+9. Validate compatibility.
+10. Validate semantic material resolution.
+11. Resolve current price.
+12. Resolve current BOM.
+13. Generate canonical configuration and hash.
+14. Generate immutable display/code snapshots.
+15. Create order row.
+16. Create order-item rows.
+17. Create order-item-module rows.
+18. Create order-item-BOM rows.
+19. Calculate order totals.
+20. Commit transaction.
 ```
 
-If any item is invalid, roll back the complete order.
-
-Do not partially create an order.
-
----
-
-## 19. Backend Validation
-
-For every submitted item, validate:
+If any step fails:
 
 ```text
-product family exists and is active
-gang count is supported
-finish scheme exists
-finish scheme is active
-finish scheme is customer visible
-module type exists
-module type is active
-slot numbers are valid
-one module exists for each required slot
-no duplicate slot numbers exist
-module is compatible with the selected product
-semantic material assignments resolve
-BOM resolves
-pricing resolves
-quantity is within allowed range
+roll back the entire transaction
 ```
 
-Do not trust configuration hashes supplied by the client.
-
-The backend may generate its own canonical hash for audit and grouping.
+Do not create partial orders.
 
 ---
 
-## 20. Pricing
+## 28. Backend Validation Rules
 
-Use a backend pricing resolver.
+Validate each submitted order item.
 
-Do not accept `estimatedUnitPrice` as authoritative.
+### Product
+
+```text
+product family exists
+product family is active
+gang count is supported
+```
+
+### Finish
+
+```text
+finish scheme exists
+finish scheme is active
+finish scheme is customer-visible
+```
+
+Do not accept the internal `init` finish scheme as a customer choice.
+
+### Slots
+
+```text
+slot numbers start at 1
+slot numbers are unique
+slot numbers do not exceed gang count
+every required slot is populated
+no unexpected additional slot exists
+```
+
+For a fully populated plate:
+
+```text
+module row count = gang count
+```
+
+### Modules
+
+```text
+module type exists
+module type is active
+module is customer-visible where applicable
+module is compatible with product family
+module is compatible with its slot
+module supports the selected gang context
+```
+
+### Quantity
+
+```text
+quantity >= 1
+quantity <= configured maximum
+```
+
+### Materials
+
+Verify that all semantic material bindings required by the resolved assembly are resolvable using:
+
+```text
+selected finish scheme
+        ↓
+finish assignment lookup
+        ↓
+init fallback
+        ↓
+error if unresolved
+```
+
+Reject order submission if required product material assignments are unresolved.
+
+Do not silently order a magenta missing-material assembly.
+
+### Pricing and BOM
+
+```text
+price resolves successfully
+BOM resolves successfully
+all required parts exist or are valid for ordering
+```
+
+---
+
+## 29. Pricing Service
+
+Implement or reuse a dedicated backend pricing service.
+
+Suggested interface:
+
+```python
+resolve_unit_price(configuration) -> Money
+```
+
+Do not place pricing logic directly in:
+
+- React components
+- API endpoint handlers
+- SQLAlchemy models
+- Three.js code
 
 At submission:
 
 ```text
-unit_price = current resolved price
+unit_price = backend resolved price
 line_total = unit_price × quantity
 ```
 
-Store:
+Use decimal-safe money types.
 
-```text
-unit_price
-line_total
-currency
-```
-
-on the order item.
-
-Store order totals on the order.
-
-Historical submitted orders must not change when current product prices change.
-
-### Initial Pricing Fallback
-
-If the existing product model does not yet have complete pricing, implement a clearly isolated pricing service with temporary values.
-
-Do not hard-code price calculations inside React components or API route handlers.
+Do not use binary floating-point for persisted currency calculations.
 
 ---
 
-## 21. BOM Resolution
+## 30. Frontend Price Estimates
 
-Use the existing prototype BOM logic if available, but move authoritative BOM generation to the backend.
+The frontend may display estimated pricing.
 
-The BOM resolver should accept the structured configuration:
+It may obtain estimates through:
+
+```text
+client-side cached catalog data
+```
+
+or:
+
+```text
+backend pricing preview endpoint
+```
+
+The backend submission result remains authoritative.
+
+If the submitted price differs from the displayed estimate, return the final totals clearly.
+
+For a later implementation, consider requiring customer confirmation when the difference exceeds a threshold.
+
+---
+
+## 31. BOM Resolver
+
+Implement or reuse a backend BOM resolver.
+
+Suggested input:
 
 ```text
 product family
 gang count
 finish scheme
-module selections
+slot modules
 quantity
 ```
 
-It should return part rows such as:
+Suggested output:
+
+```text
+part ID
+part code
+part name
+quantity per assembly
+total quantity
+unit cost, optional
+```
+
+The BOM should resolve product/manufacturing parts, not rendering details.
+
+Possible parts:
 
 ```text
 plate
 plate screws
-module internals
+switch module
+dimmer module
+outlet module
 actuator
+insulator
+electrical core
 packaging
 ```
 
-At order submission, copy the resolved BOM into `order_item_bom`.
-
-The preview may continue showing a live derived BOM, but the submitted order must use the backend result.
+Do not use GLB paths as BOM part identifiers.
 
 ---
 
-## 22. Semantic Materials and Orders
+## 32. Materials and Order Data
 
-Orders should store customer product choices, not every resolved render-material assignment.
-
-Store:
+The order stores customer-facing finish choices:
 
 ```text
 finish_scheme_id
@@ -936,23 +1298,25 @@ finish_scheme_code_snapshot
 finish_scheme_name_snapshot
 ```
 
-Do not store the complete semantic material assignment map as the primary order configuration.
+Do not store the full Three.js material graph or every material assignment on the order item.
 
-Material assignments remain part of the product-definition system:
+The material system remains:
 
 ```text
-finish_scheme + binding_name → render_material
+finish scheme + semantic binding
+        ↓
+render material
 ```
 
-Optionally include a resolved material snapshot in an exported order document for debugging, but it is not required in the core order schema.
+Material assignment validation is required before submission, but render-material instances are not core commercial order data.
 
-Manufacturing identity should be represented through product options and BOM parts, not Three.js material instances.
+The BOM should contain the manufacturing identity required to produce the chosen finish where applicable.
 
 ---
 
-## 23. Historical Stability
+## 33. Historical Snapshots
 
-Submitted orders must remain understandable even if live entities are renamed or disabled.
+Submitted orders must remain understandable if live data changes later.
 
 Store both:
 
@@ -962,55 +1326,154 @@ snapshot code
 snapshot display name
 ```
 
-Example:
+Examples:
 
 ```text
-finish_scheme_id = 7
+product_family_id = 1
+product_code_snapshot = "electrical_device"
+product_name_snapshot = "Electrical Device"
+```
+
+```text
+finish_scheme_id = 4
 finish_scheme_code_snapshot = "brass"
 finish_scheme_name_snapshot = "Brass"
 ```
 
-Use the snapshot fields when displaying historical orders.
+```text
+module_type_id = 2
+module_code_snapshot = "rotary_dimmer"
+module_name_snapshot = "Rotary Dimmer"
+```
 
-The foreign key may still support internal traceability.
+Historical UI should display snapshots, not current live names.
 
-Do not automatically update snapshots when live product names change.
+Do not automatically update order snapshots when catalog names change.
 
 ---
 
-## 24. Order Immutability
+## 34. Order Immutability
 
-Before submission, draft order items are editable in browser storage.
-
-After database submission:
+After submission, treat these as immutable:
 
 ```text
-commercial configuration
+product choices
+gang count
+slot modules
+finish
 quantity
 unit price
 line total
 BOM snapshot
+configuration hash
+configuration version
 ```
 
-should be treated as immutable for the first implementation.
+For the first implementation, do not support editing submitted order contents.
 
-Later, order changes should use explicit administrative workflows rather than silently editing original rows.
+Administrative status changes are permitted.
 
-A cancelled order should remain in the database with status:
+Cancellation should update status:
 
 ```text
 cancelled
 ```
 
-Do not hard-delete submitted orders through the normal UI.
+Do not delete submitted commercial orders from the normal UI.
 
 ---
 
-## 25. Admin Order View
+## 35. Idempotency
 
-Add a basic internal order-management view if the current app includes admin functionality.
+Prevent duplicate orders caused by:
 
-Recommended internal route:
+- double-clicking Submit
+- browser retries
+- network timeouts
+- page refreshes
+- repeated API requests
+
+Frontend:
+
+1. Generate a UUID before submission.
+2. Store it in submission state.
+3. Send it as `idempotency_key`.
+4. Disable Submit while the request is in progress.
+
+Backend:
+
+1. Require or accept the idempotency key according to repository conventions.
+2. Add a unique database constraint.
+3. If the key already exists, return the existing order.
+4. Do not create a second order.
+
+The idempotency key must not be reused for a newly edited order.
+
+---
+
+## 36. Order Confirmation
+
+After successful submission:
+
+1. Store the returned public order number.
+2. Clear the submitted draft from `localStorage`.
+3. Clear edit state.
+4. Navigate to an order-confirmation page.
+5. Show final backend-calculated totals.
+6. Show submitted items.
+7. Prevent accidental resubmission.
+
+Suggested route:
+
+```text
+/order-confirmation/{orderNumber}
+```
+
+Example:
+
+```text
+Thank you.
+
+Your order number:
+LAT-ORD-000124
+```
+
+Do not expose the internal primary key.
+
+---
+
+## 37. Failed Submission
+
+If submission fails:
+
+- do not clear `localStorage`
+- preserve all draft items
+- preserve entered customer information where safe
+- re-enable Submit
+- display a clear error
+- show item-specific errors where available
+
+Examples:
+
+```text
+The Brass finish is no longer available.
+
+Slot 2 contains a module that is not supported by this plate.
+
+Material assignment `brass + actuator_metal` is missing.
+
+We could not calculate the BOM. The order was not submitted.
+
+Your draft order remains saved in this browser.
+```
+
+---
+
+## 38. Admin Order List
+
+Add a basic internal order-management view if the application already supports admin routes.
+
+Suggested route:
 
 ```text
 /admin/orders
@@ -1023,74 +1486,121 @@ order number
 submitted date
 customer
 status
-item count
-total
+unique item count
+total unit count
+order total
 ```
 
-Order detail should show:
+Distinguish:
 
 ```text
+unique item count
+```
+
+from:
+
+```text
+total physical unit count
+```
+
+Example:
+
+```text
+2 unique items
+7 physical assemblies
+```
+
+---
+
+## 39. Admin Order Detail
+
+Display:
+
+```text
+order number
+status
 customer information
 shipping address
-order totals
-each order item
-item configuration
+submitted date
+currency
+subtotal
+tax
+shipping
+total
+notes
+```
+
+For every order item show:
+
+```text
+product snapshot
+gang count
+finish snapshot
+slot modules
 quantity
-price snapshot
-module selections
+unit price
+line total
+configuration hash
+configuration version
 BOM snapshot
 ```
 
-Administrative status changes may be supported:
+Do not display or require an Assignment State.
+
+---
+
+## 40. Order Status Updates
+
+Allow internal status changes if consistent with the existing admin system.
+
+Suggested transition set:
 
 ```text
 submitted
 quoted
+payment_pending
 paid
 in_production
 shipped
+completed
 cancelled
 ```
 
-Do not implement payment processing unless already in scope.
+Centralize transition rules.
+
+Do not let arbitrary frontend strings update status.
+
+Record `updated_at`.
+
+A future audit log may record status history, but it is not required unless already supported.
 
 ---
 
-## 26. Database Constraints
+## 41. Recommended SQLAlchemy Models
 
-Recommended constraints:
-
-```text
-orders.order_number UNIQUE
-order_items.quantity > 0
-order_items.gang_count > 0
-order_items.unit_price >= 0
-order_items.line_total >= 0
-UNIQUE(order_item_id, slot_number)
-order_item_bom.quantity_per_assembly > 0
-order_item_bom.assembly_quantity > 0
-order_item_bom.total_quantity > 0
-```
-
-Use foreign-key enforcement in SQLite.
-
-Use cascade deletion only for child rows of an unsubmitted test order where deletion is explicitly allowed.
-
-Avoid deleting submitted commercial orders.
-
----
-
-## 27. Suggested SQLAlchemy Structure
-
-Adapt to repository conventions.
+Adapt names and types to project conventions.
 
 ```python
 class Order(Base):
     __tablename__ = "orders"
 
     order_id = Column(Integer, primary_key=True)
-    order_number = Column(String, nullable=False, unique=True)
-    status = Column(String, nullable=False)
+
+    order_number = Column(
+        String,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    idempotency_key = Column(
+        String,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    status = Column(String, nullable=False, default="submitted")
 
     customer_name = Column(String, nullable=False)
     customer_email = Column(String, nullable=False)
@@ -1104,8 +1614,9 @@ class Order(Base):
     shipping_country = Column(String, nullable=False, default="US")
 
     currency = Column(String, nullable=False, default="USD")
+
     subtotal = Column(Numeric(12, 2), nullable=False)
-    tax = Column(Numeric(12, 2), nullable=False)
+    tax_amount = Column(Numeric(12, 2), nullable=False)
     shipping_amount = Column(Numeric(12, 2), nullable=False)
     total = Column(Numeric(12, 2), nullable=False)
 
@@ -1126,6 +1637,7 @@ class OrderItem(Base):
         Integer,
         ForeignKey("orders.order_id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     product_family_id = Column(
@@ -1143,15 +1655,19 @@ class OrderItem(Base):
     gang_count = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False)
 
+    configuration_version = Column(Integer, nullable=False, default=1)
+    configuration_hash = Column(String, nullable=False, index=True)
+
     unit_price = Column(Numeric(12, 2), nullable=False)
     line_total = Column(Numeric(12, 2), nullable=False)
 
-    configuration_version = Column(Integer, nullable=False, default=1)
-
     product_code_snapshot = Column(String, nullable=False)
     product_name_snapshot = Column(String, nullable=False)
+
     finish_scheme_code_snapshot = Column(String, nullable=False)
     finish_scheme_name_snapshot = Column(String, nullable=False)
+
+    configuration_snapshot_json = Column(Text, nullable=True)
 
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False)
@@ -1167,6 +1683,7 @@ class OrderItemModule(Base):
         Integer,
         ForeignKey("order_items.order_item_id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     slot_number = Column(Integer, nullable=False)
@@ -1181,12 +1698,13 @@ class OrderItemModule(Base):
     module_name_snapshot = Column(String, nullable=False)
 
     created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
             "order_item_id",
             "slot_number",
-            name="uq_order_item_slot",
+            name="uq_order_item_module_slot",
         ),
     )
 ```
@@ -1201,6 +1719,7 @@ class OrderItemBom(Base):
         Integer,
         ForeignKey("order_items.order_item_id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     part_id = Column(
@@ -1217,22 +1736,81 @@ class OrderItemBom(Base):
     total_quantity = Column(Integer, nullable=False)
 
     unit_cost_snapshot = Column(Numeric(12, 2), nullable=True)
+
     created_at = Column(DateTime, nullable=False)
 ```
 
+Use ORM relationships and cascading behavior consistent with the codebase.
+
 ---
 
-## 28. Frontend Services
+## 42. API Response
 
-Create dedicated frontend modules instead of placing all logic in components.
+Example successful response:
 
-Suggested responsibilities:
+```json
+{
+  "order_number": "LAT-ORD-000124",
+  "status": "submitted",
+  "currency": "USD",
+  "subtotal": "990.00",
+  "tax_amount": "0.00",
+  "shipping_amount": "0.00",
+  "total": "990.00",
+  "submitted_at": "2026-07-22T20:15:00Z",
+  "items": [
+    {
+      "product_name": "Electrical Device",
+      "gang_count": 1,
+      "finish_name": "Brass",
+      "quantity": 2,
+      "unit_price": "285.00",
+      "line_total": "570.00",
+      "modules": [
+        {
+          "slot_number": 1,
+          "module_name": "Rotary Dimmer"
+        }
+      ]
+    },
+    {
+      "product_name": "Electrical Device",
+      "gang_count": 2,
+      "finish_name": "Steel",
+      "quantity": 1,
+      "unit_price": "420.00",
+      "line_total": "420.00",
+      "modules": [
+        {
+          "slot_number": 1,
+          "module_name": "Switch"
+        },
+        {
+          "slot_number": 2,
+          "module_name": "Outlet"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Return decimal values consistently according to existing API conventions.
+
+---
+
+## 43. Frontend Services
+
+Create dedicated modules rather than putting all logic into page components.
+
+Suggested services:
 
 ```text
-currentConfigurationService
+currentAssemblyService
 draftOrderService
 configurationCanonicalizer
 orderApiService
+orderEditService
 ```
 
 ### `draftOrderService`
@@ -1240,14 +1818,16 @@ orderApiService
 Responsibilities:
 
 ```text
-load draft order from localStorage
-save draft order
+load draft from localStorage
+validate draft
+save draft
 add item
 merge identical item
 update item
 remove item
 change quantity
 clear order
+calculate estimated totals
 ```
 
 ### `configurationCanonicalizer`
@@ -1255,10 +1835,11 @@ clear order
 Responsibilities:
 
 ```text
-normalize configuration
-sort modules
-generate canonical string
-generate configuration hash
+normalize product code
+normalize finish code
+sort modules by slot
+generate deterministic representation
+generate hash
 ```
 
 ### `orderApiService`
@@ -1268,309 +1849,401 @@ Responsibilities:
 ```text
 submit order
 load order confirmation
-handle API validation errors
+load admin order list, if in scope
+load admin order details, if in scope
+update status, if in scope
+normalize API errors
 ```
 
 ---
 
-## 29. Order Confirmation
+## 44. Backend Services
 
-After successful submission:
+Keep route handlers thin.
 
-1. Clear the draft order from `localStorage`.
-2. Show an order-confirmation page.
-3. Display the public order number.
-4. Display submitted items and totals.
-5. Prevent accidental resubmission on browser refresh.
-
-Suggested route:
+Suggested services:
 
 ```text
-/order-confirmation/{orderNumber}
+OrderSubmissionService
+OrderValidationService
+PricingService
+BomResolver
+ConfigurationCanonicalizer
+OrderNumberService
+MaterialResolutionValidator
 ```
 
-Example:
+Suggested submission entry point:
 
-```text
-Thank you.
-
-Your order number is:
-LAT-ORD-000124
+```python
+submit_order(command: SubmitOrderCommand) -> SubmittedOrder
 ```
 
-Do not expose internal database IDs.
+The service should own the database transaction.
 
 ---
 
-## 30. Concurrency and Idempotency
+## 45. Migrations
 
-Prevent duplicate order creation when a user double-clicks Submit or refreshes during submission.
-
-Use an idempotency token.
-
-Frontend:
+Create migrations for:
 
 ```text
-generate UUID when beginning submission
-send as idempotency_key
+orders
+order_items
+order_item_modules
+order_item_bom
 ```
 
-Backend:
+Do not modify or delete:
 
 ```text
-store idempotency_key with the order
-return the existing order if the same key is submitted again
+assignment_states
+assignment_state_modules
 ```
 
-Add a uniqueness constraint:
+Do not recreate the old `configurations` table.
+
+If an unused old `configurations` table still exists physically, leave it alone unless the user has explicitly requested database cleanup.
+
+Do not migrate old configuration rows into orders.
+
+Enable SQLite foreign-key enforcement.
+
+Add indexes for:
 
 ```text
-orders.idempotency_key UNIQUE
+orders.order_number
+orders.idempotency_key
+orders.status
+orders.submitted_at
+order_items.order_id
+order_items.configuration_hash
+order_item_modules.order_item_id
+order_item_bom.order_item_id
 ```
-
-Disable the submit button while the request is in progress.
 
 ---
 
-## 31. Migration From Saved Configurations
+## 46. Existing Configuration Code Cleanup
 
-Remove the user-facing Saved Configurations feature after the order workflow is working.
+Remove only public or obsolete references that still treat saved configurations as a customer feature.
 
-Migration steps:
+Remove or rename:
 
 ```text
-1. Keep the current configuration in React state.
-2. Add draft-order localStorage support.
-3. Add Add to Order.
-4. Add Order review page.
-5. Add order database schema.
-6. Add order submission API.
-7. Add order confirmation.
-8. Remove Save Configuration button.
-9. Remove Saved Configurations list.
-10. Remove obsolete saved-configuration endpoints and tables if unused elsewhere.
+Save Configuration
+Saved Configurations
+configuration cart behavior
+customer configuration endpoints
 ```
 
-Before deleting any existing configuration table, inspect whether it contains internal test data that should be exported or migrated.
+Do not remove references related to:
 
-Do not delete existing data silently during migration.
+```text
+Assignment States
+Assignments tab
+admin viewport presets
+assignment-state modules
+```
 
-If the current configuration table is used only by the prototype, document its removal in the migration.
+Before deleting code, distinguish whether it belongs to:
+
+```text
+old customer configuration prototype
+```
+
+or:
+
+```text
+current assignment-state admin system
+```
 
 ---
 
-## 32. Export JSON
+## 47. Tests — Backend
 
-The current Export JSON function may remain as an internal debugging tool, but it should not be presented as the primary customer order action.
-
-Possible internal export:
-
-```json
-{
-  "order_number": "LAT-ORD-000124",
-  "status": "submitted",
-  "items": [
-    {
-      "product_family_code": "electrical_device",
-      "gang_count": 1,
-      "finish_scheme_code": "brass",
-      "quantity": 2,
-      "modules": [
-        {
-          "slot_number": 1,
-          "module_type_code": "rotary_dimmer"
-        }
-      ],
-      "unit_price": 285.00,
-      "line_total": 570.00
-    }
-  ]
-}
-```
-
-The database remains authoritative.
-
----
-
-## 33. Testing
-
-### Backend Tests
-
-Implement tests for:
+Implement tests for at least:
 
 ```text
 create one-item order
 create multi-item order
-create multi-gang order item
+create one-gang item
+create two-gang item
+create four-gang item
+create multiple quantities of one item
 reject empty order
-reject quantity below one
-reject invalid finish scheme
-reject hidden or inactive finish scheme
-reject invalid module
-reject missing slot
-reject duplicate slot
+reject zero quantity
+reject negative quantity
 reject unsupported gang count
-calculate line total correctly
-calculate order subtotal correctly
-create BOM snapshot
-create display-name snapshots
-rollback complete order on item failure
-idempotent duplicate submission
+reject invalid product family
+reject inactive product family
+reject invalid finish
+reject inactive finish
+reject non-customer-visible finish
+reject init finish as customer selection
+reject invalid module type
+reject inactive module
+reject duplicate slot
+reject missing slot
+reject slot above gang count
+reject incompatible module
+reject unresolved semantic material binding
+reject unresolved price
+reject unresolved BOM
+calculate unit price
+calculate line total
+calculate subtotal
+calculate final total
+create product snapshots
+create finish snapshots
+create module snapshots
+create BOM snapshots
+generate deterministic configuration hash
+rollback complete transaction on failure
+return existing order for repeated idempotency key
 generate unique public order number
 ```
 
-### Frontend Tests
+Also test that order creation does not read from or depend on `assignment_states`.
 
-Test:
+---
+
+## 48. Tests — Frontend
+
+Implement tests for:
 
 ```text
-Add to Order creates one draft item
-adding identical configuration increases quantity
-adding different finish creates a new item
-adding different module creates a new item
-draft survives page reload
-quantity can be changed
+Add to Order creates a draft item
+identical configuration increases quantity
+different finish creates a separate item
+different module creates a separate item
+different slot order normalizes correctly
+different gang count creates a separate item
+draft survives reload
+malformed localStorage is handled
+quantity can increase
+quantity can decrease
 item can be removed
 order can be cleared
-item can be edited
-edited item can merge with an identical item
+edit loads item into Assembly tab
+edit updates item
+edit merges with identical existing item
+failed submission preserves draft
+successful submission clears draft
 submit button disables during request
-successful submit clears localStorage
-failed submit preserves draft order
-order confirmation displays order number
+idempotency key is reused during one retry sequence
+new edited submission gets a new idempotency key
+confirmation shows public order number
 ```
 
-### Manual Scenarios
+Ensure public-order tests do not use Assignment States.
 
-Test at least:
+---
+
+## 49. Manual Acceptance Scenarios
+
+Test manually:
+
+### Scenario A
 
 ```text
-1 × Brass Rotary Dimmer
-4 × Brass Rotary Dimmer
-2 × Steel Switch
-one order containing Brass Dimmer and Steel Switch
-edit Brass Dimmer into Steel Dimmer
-remove one line
-reload browser with a draft order
-submit order
-retry submission after simulated timeout
+Configure 1-Gang Brass Rotary Dimmer
+Add to Order
+Add the identical assembly again
+```
+
+Expected:
+
+```text
+one draft line
+quantity = 2
+```
+
+### Scenario B
+
+```text
+Configure 1-Gang Brass Switch
+Add to Order
+
+Configure 1-Gang Steel Switch
+Add to Order
+```
+
+Expected:
+
+```text
+two draft lines
+```
+
+### Scenario C
+
+```text
+Configure 2-Gang Brass:
+slot 1 = switch
+slot 2 = dimmer
+```
+
+Expected:
+
+```text
+one order item
+two order_item_modules rows
+```
+
+### Scenario D
+
+```text
+Configure 4-Gang Steel:
+slot 1 = switch
+slot 2 = switch
+slot 3 = outlet
+slot 4 = USB-C
+quantity = 5
+```
+
+Expected:
+
+```text
+one order item
+quantity = 5
+four module rows
+BOM quantities multiplied by 5
+```
+
+### Scenario E
+
+```text
+Open Assignments tab
+Select an Assignment State
+Change preview finish
+```
+
+Expected:
+
+```text
+admin assignment workflow behaves exactly as before
+no order rows are created
+```
+
+### Scenario F
+
+```text
+Submit an order
+simulate network timeout
+retry with the same idempotency key
+```
+
+Expected:
+
+```text
+one database order
+same order returned
 ```
 
 ---
 
-## 34. Error Handling
+## 50. Non-Goals
 
-Handle these cases clearly:
-
-```text
-localStorage data is invalid
-draft-order schema version is unsupported
-selected finish became inactive before submission
-selected module was removed before submission
-pricing cannot resolve
-BOM cannot resolve
-network request fails
-order submission times out
-duplicate submission occurs
-database transaction fails
-```
-
-Example messages:
-
-```text
-This finish is no longer available. Please choose another finish.
-
-The Rotary Dimmer is no longer available for slot 1.
-
-We could not calculate the order price. The order was not submitted.
-
-Your draft order is still saved in this browser.
-```
-
-Do not clear the draft order after a failed submission.
-
----
-
-## 35. Non-Goals
-
-Do not implement these unless already present in the repository:
+Do not implement unless already present and explicitly required:
 
 ```text
 payment processing
-user accounts
-cross-device cart synchronization
-abandoned-cart database tracking
-global reusable configuration records
-one configuration row per physical unit
-full ecommerce inventory reservation
-shipping-provider integration
-tax-provider integration
+customer accounts
+customer saved configurations
+global configuration deduplication
+database-backed abandoned carts
+cross-device cart sync
 discount codes
+inventory reservation
+tax-provider integration
+shipping-provider integration
 returns
-order editing after submission
-automatic manufacturing scheduling
+refunds
+post-submission item editing
+manufacturing scheduling
+assignment-state integration with public orders
+one database row per physical unit
 ```
 
-Use isolated service interfaces where future integrations are expected.
+Design service boundaries so these can be added later.
 
 ---
 
-## 36. Acceptance Criteria
+## 51. Acceptance Criteria
 
 The implementation is complete when:
 
-1. `Save Configuration` is removed from the user workflow.
-2. `Saved Configurations` is removed from the user workflow.
-3. The Assembly tab has `Add to Order`.
-4. Draft order items are stored in browser `localStorage`.
-5. One draft order supports multiple differently configured assemblies.
-6. Identical configurations merge into one line with increased quantity.
-7. Different configurations remain separate order items.
-8. The Order page supports quantity editing, removal, and configuration editing.
-9. Submitted orders are stored in `orders`.
-10. Structured assembly data is stored in `order_items` and `order_item_modules`.
-11. There is no separate global `configurations` table.
-12. Large `configuration_json` blobs are not used as the authoritative model.
-13. One order item represents one unique assembly configuration multiplied by quantity.
-14. Backend validation rechecks all product choices.
-15. Backend pricing is authoritative.
-16. Unit-price and line-total snapshots are saved.
-17. BOM snapshots are stored in `order_item_bom`.
-18. Historical names and codes are stored as snapshots.
-19. Order submission is transactional.
-20. Duplicate submissions are prevented through idempotency.
-21. Successful submission clears the browser draft.
-22. Failed submission preserves the browser draft.
-23. The order confirmation displays a public order number.
-24. Future multi-gang products can be represented through slot rows.
-25. No database rows are created merely because a visitor changes configurator options.
+1. The customer Assembly tab uses `Add to Order`.
+2. Customer-facing `Save Configuration` is removed.
+3. Customer-facing `Saved Configurations` is removed.
+4. Draft order state is stored in browser `localStorage`.
+5. Opening or editing the configurator creates no order database rows.
+6. One draft supports multiple different assemblies.
+7. Identical assemblies merge by quantity.
+8. Different structured assemblies remain separate lines.
+9. Draft items support 1–4 gangs.
+10. Each slot stores its own module selection.
+11. The Order page supports quantity editing.
+12. The Order page supports item removal.
+13. The Order page supports assembly editing.
+14. Submitted orders are stored in `orders`.
+15. Structured assembly choices are stored in `order_items`.
+16. Slot choices are stored in `order_item_modules`.
+17. There is no global customer `configurations` table.
+18. The authoritative order configuration is not stored only as JSON.
+19. One order item represents one unique assembly multiplied by quantity.
+20. Backend validation checks all submitted choices.
+21. Backend pricing is authoritative.
+22. Backend BOM resolution is authoritative.
+23. Price snapshots are stored.
+24. Product, finish, and module snapshots are stored.
+25. BOM snapshots are stored in `order_item_bom`.
+26. Submission is transactional.
+27. Failed submission creates no partial order.
+28. Duplicate submission is prevented through idempotency.
+29. Successful submission clears the draft.
+30. Failed submission preserves the draft.
+31. Confirmation displays a public order number.
+32. Historical order display uses snapshot fields.
+33. The order system does not depend on Assignment States.
+34. `assignment_states` and `assignment_state_modules` remain intact.
+35. The Assignments tab continues using Assignment States for viewport geometry.
+36. No order rows are created by admin assignment debugging.
+37. No Assignment State is created by customer ordering.
+38. Existing material-assignment resolution continues to work.
+39. Missing required material assignments block order submission.
+40. Tests cover one-, two-, three-, and four-gang assemblies.
 
 ---
 
-## 37. Guiding Principles
+## 52. Guiding Principles
 
 ```text
-The configurator edits one current assembly.
+Assignment States are admin viewport/debug presets.
 
-The draft order contains one or more configured assemblies.
+Customer assemblies are temporary frontend state until added to an order.
 
-Draft state lives in the browser.
+Draft orders live in the browser.
 
-The database stores submitted commercial intent.
+Submitted commercial intent lives in the database.
 
-One order item represents one unique configured assembly times quantity.
+Orders never depend on Assignment States.
 
-Product choices are relational and structured.
+One order item represents one unique structured assembly times quantity.
 
-Do not create a global configuration registry.
+Modules are stored per slot.
 
-Do not store one record per physical device.
+Do not create a global customer configuration registry.
 
-Do not treat frontend prices as authoritative.
+Do not store one row per physical device.
 
-Preserve price, label, and BOM snapshots at submission.
+Do not trust frontend prices, totals, validation, or hashes.
 
-Keep rendering details separate from order data.
+Preserve historical product, finish, module, price, and BOM snapshots.
 
-Build for multi-gang products now without overengineering the rest.
+Keep Three.js rendering state separate from commercial order data.
+
+Build the relational model for 1–4 gangs now.
+
+Do not disturb the existing assignment-state workflow.
 ```

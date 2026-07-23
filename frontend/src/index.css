@@ -329,6 +329,18 @@ body {
   grid-template-columns: 260px minmax(380px, 440px) 1fr;
 }
 
+.materials-manager.assignment-states-manager {
+  grid-template-columns: 280px 1fr;
+}
+
+.assignment-state-editor h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 .text-input {
   padding: 9px 11px;
   border: 1px solid var(--panel-border);

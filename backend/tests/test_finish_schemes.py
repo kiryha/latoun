@@ -84,15 +84,28 @@ def test_block_deletion_of_init(client):
     assert "init" in response.json()["message"].lower()
 
 
-def test_block_deletion_when_configurations_reference_scheme(client):
-    client.post(
-        "/api/configurations",
-        json={"gang_count": 1, "module_type": "dimmer", "finish_scheme": "brass"},
+def test_block_deletion_when_assembly_states_reference_scheme(client):
+    catalog = client.get("/api/catalog").json()
+    switch_id = next(
+        module["module_type_id"]
+        for module in catalog["module_types"]
+        if module["code"] == "switch"
     )
     scheme_id = _scheme_id(client, "brass")
+    created = client.post(
+        "/api/assignment-states",
+        json={
+            "display_name": "switch",
+            "gang_count": 1,
+            "default_finish_scheme_id": scheme_id,
+            "modules": [{"slot_number": 1, "module_type_id": switch_id}],
+        },
+    )
+    assert created.status_code == 201, created.text
+
     response = client.delete(f"/api/finish-schemes/{scheme_id}")
     assert response.status_code == 409
-    assert "configuration" in response.json()["message"].lower()
+    assert "assembly state" in response.json()["message"].lower()
 
 
 def test_create_assignment(client):

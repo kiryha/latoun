@@ -2,11 +2,11 @@
 // backend; this module only transports semantic codes and resolved state.
 
 import type {
+  AssignmentState,
+  AssignmentStateCreate,
+  AssignmentStateUpdate,
   BulkAssignmentsRequest,
   Catalog,
-  ConfigurationDetail,
-  ConfigurationRequest,
-  ConfigurationSummary,
   FinishScheme,
   FinishSchemeCreate,
   FinishSchemeUpdate,
@@ -16,11 +16,11 @@ import type {
   MaterialAssignmentUpdate,
   MaterialCreate,
   MaterialUpdate,
+  RenderResolveRequest,
   RenderState,
   ResolvedAssignments,
 } from "../types";
 
-// Empty base -> use Vite proxy ("/api"). Override with VITE_API_BASE if needed.
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export class ApiError extends Error {
@@ -39,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { "Content-Type": "application/json" },
       ...init,
     });
-  } catch (cause) {
+  } catch {
     throw new ApiError(
       "Backend unavailable. Is the FastAPI server running on port 8000?",
       0,
@@ -66,27 +66,10 @@ export const api = {
 
   getCatalog: () => request<Catalog>("/api/catalog"),
 
-  resolveConfiguration: (payload: ConfigurationRequest) =>
-    request<RenderState>("/api/configurations/resolve", {
+  resolveRender: (payload: RenderResolveRequest) =>
+    request<RenderState>("/api/render/resolve", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
-
-  saveConfiguration: (payload: ConfigurationRequest) =>
-    request<ConfigurationSummary>("/api/configurations", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-
-  listConfigurations: () =>
-    request<ConfigurationSummary[]>("/api/configurations"),
-
-  getConfiguration: (id: number) =>
-    request<ConfigurationDetail>(`/api/configurations/${id}`),
-
-  deleteConfiguration: (id: number) =>
-    request<ConfigurationSummary>(`/api/configurations/${id}`, {
-      method: "DELETE",
     }),
 
   listMaterials: () => request<MaterialAdmin[]>("/api/materials"),
@@ -108,7 +91,6 @@ export const api = {
       method: "DELETE",
     }),
 
-  // Finish schemes ---------------------------------------------------------- //
   listFinishSchemes: (params?: {
     isActive?: boolean;
     isCustomerVisible?: boolean;
@@ -144,7 +126,6 @@ export const api = {
       `/api/finish-schemes/${code}/resolved-assignments`,
     ),
 
-  // Material assignments ---------------------------------------------------- //
   listAssignments: (finishSchemeId: number) =>
     request<MaterialAssignment[]>(
       `/api/finish-schemes/${finishSchemeId}/assignments`,
@@ -181,4 +162,44 @@ export const api = {
     request<MaterialAssignment>(`/api/material-assignments/${id}`, {
       method: "DELETE",
     }),
+
+  listAssignmentStates: (params?: { isActive?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.isActive !== undefined)
+      query.set("is_active", String(params.isActive));
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<AssignmentState[]>(`/api/assignment-states${suffix}`);
+  },
+
+  getAssignmentState: (id: number) =>
+    request<AssignmentState>(`/api/assignment-states/${id}`),
+
+  createAssignmentState: (payload: AssignmentStateCreate) =>
+    request<AssignmentState>("/api/assignment-states", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateAssignmentState: (id: number, payload: AssignmentStateUpdate) =>
+    request<AssignmentState>(`/api/assignment-states/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteAssignmentState: (id: number) =>
+    request<AssignmentState>(`/api/assignment-states/${id}`, {
+      method: "DELETE",
+    }),
+
+  resolveAssignmentStateRender: (
+    id: number,
+    finishScheme?: string | null,
+  ) => {
+    const query = new URLSearchParams();
+    if (finishScheme) query.set("finish_scheme", finishScheme);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return request<RenderState>(
+      `/api/assignment-states/${id}/render-state${suffix}`,
+    );
+  },
 };

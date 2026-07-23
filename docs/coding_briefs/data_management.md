@@ -22,7 +22,7 @@ Material library
     Defines how physical materials look in Three.js.
 
 Render state
-    Describes which assets and materials are needed for one configuration.
+    Describes which assets and materials are needed for one assembly.
 ```
 
 The manufacturing BOM structure and render asset structure do not need to match one-to-one.
@@ -392,7 +392,7 @@ The asset manifest should not contain:
 - Product compatibility rules
 - Final customer material selection
 
-Those belong in the database, material library, or configuration services.
+Those belong in the database, material library, or render/assignment services.
 
 ### 10.4 Why Use a Manifest
 
@@ -402,7 +402,7 @@ The manifest provides one clean mapping:
 
 ```text
 Semantic asset key
-    ↓
+    ?
 Physical GLB path
 ```
 
@@ -410,11 +410,11 @@ Example:
 
 ```text
 module.1gang.slot01.switch
-    ↓
+    ?
 /assets/glb/1gang_slot01_switch.glb
 ```
 
-This also allows a filename to change without changing configuration logic.
+This also allows a filename to change without changing assembly-resolution logic.
 
 ---
 
@@ -464,15 +464,17 @@ Do not force a one-to-one mapping between them.
 
 GLB files should contain geometry and default placeholder materials.
 
-The final Three.js render material is assigned after the backend resolves the configuration.
+The final Three.js render material is assigned after the backend resolves the assembly and finish scheme.
 
-Example customer configuration:
+Example ad-hoc assembly request:
 
 ```json
 {
   "gang_count": 1,
-  "module_type": "dimmer",
-  "material": "brass"
+  "modules": [
+    { "slot_number": 1, "module_type": "dimmer" }
+  ],
+  "finish_scheme": "brass"
 }
 ```
 
@@ -539,13 +541,13 @@ bind_steel
 bind_black
 ```
 
-The binding describes the geometry’s role, not its final appearance.
+The binding describes the geometry�s role, not its final appearance.
 
 Example:
 
 ```text
 bind_plate_body
-    ↓
+    ?
 material.solid_brass.brushed
 ```
 
@@ -553,7 +555,7 @@ or:
 
 ```text
 bind_plate_body
-    ↓
+    ?
 material.stainless_steel.brushed
 ```
 
@@ -628,7 +630,7 @@ Example:
 
 ```text
 1gang_plate.glb
-    all geometry → brass or steel
+    all geometry ? brass or steel
 ```
 
 The limitation is that it cannot represent mixed-material assets such as:
@@ -707,16 +709,20 @@ How should this region look?
 
 ## 16. Resolved Render State
 
-The backend resolves the product configuration into a render state.
+The backend resolves the assembly and finish scheme into a render state.
 
 Example:
 
 ```json
 {
-  "configuration": {
+  "assembly": {
     "gang_count": 1,
-    "module_type": "dimmer",
-    "material": "brass"
+    "modules": [
+      { "slot_number": 1, "module_type": "dimmer" }
+    ],
+    "finish_scheme": "brass",
+    "assignment_state_code": "LAT-ASG-000001",
+    "assignment_state_display_name": "1-Gang Dimmer"
   },
   "assets": [
     {
@@ -746,6 +752,8 @@ Example:
 }
 ```
 
+Persisted viewport assemblies are stored as **Assignment States** (`assignment_states` + `assignment_state_modules`). The Assembly tab uses ad-hoc `POST /api/render/resolve`; the Assignments tab loads saved states via `GET /api/assignment-states/{id}/render-state`.
+
 The frontend should not decide:
 
 - Which asset corresponds to a dimmer
@@ -773,7 +781,7 @@ Bake transforms
 Assign semantic placeholder materials
 Export GLB
 
-        ↓
+        ?
 
 GLB FILES
 Geometry
@@ -781,7 +789,7 @@ Mesh names
 Default placeholder materials
 Semantic material-binding names
 
-        ↓
+        ?
 
 ASSET MANIFEST
 Semantic asset keys
@@ -789,25 +797,25 @@ GLB paths
 Asset metadata
 Expected bindings
 
-        ↓
+        ?
 
-PRODUCT CONFIGURATION
+PRODUCT ASSEMBLY
 Gang count
-Module type
-Physical material
-Surface treatment
+Per-slot module types
+Finish scheme
+(or a saved Assignment State loaded by ID)
 
-        ↓
+        ?
 
 BACKEND
-Validate configuration
+Validate assembly
 Resolve asset keys
 Read asset manifest
-Resolve render material identifiers
+Resolve render material identifiers via finish scheme + init
 Generate render state
 Generate BOM separately
 
-        ↓
+        ?
 
 THREE.JS
 Load GLB files
@@ -867,20 +875,20 @@ They are not needed during the local prototype stage.
 
 ```text
 assets/
-├── glb/
-│   ├── plates/
-│   │   └── 1gang_plate.glb
-│   ├── hardware/
-│   │   └── 1gang_plate_screws.glb
-│   └── modules/
-│       └── 1gang/
-│           ├── 1gang_slot01_dimmer.glb
-│           └── 1gang_slot01_switch.glb
-├── textures/
-│   ├── metals/
-│   └── plastics/
-├── asset_manifest.json
-└── render_materials.json
+??? glb/
+?   ??? plates/
+?   ?   ??? 1gang_plate.glb
+?   ??? hardware/
+?   ?   ??? 1gang_plate_screws.glb
+?   ??? modules/
+?       ??? 1gang/
+?           ??? 1gang_slot01_dimmer.glb
+?           ??? 1gang_slot01_switch.glb
+??? textures/
+?   ??? metals/
+?   ??? plastics/
+??? asset_manifest.json
+??? render_materials.json
 ```
 
 For the first implementation, keeping all GLB files in one folder is also acceptable:
@@ -923,12 +931,12 @@ bind_actuator_primary
 
 ## 21. Current v0.1 Decisions
 
-The first configurator will use:
+The first configurator uses:
 
 ```text
-1-gang plate only
-switch or rotary dimmer
-brass or steel
+1-gang GLB assets only (model supports 1�4 gangs)
+switch or rotary dimmer per slot
+finish schemes resolve materials via material_assignments
 separate GLB files for plate, screws, and module
 all parts positioned in Houdini
 all GLBs loaded at origin
@@ -939,6 +947,8 @@ semantic material bindings added when mixed materials are needed
 no runtime positioning system
 no geometry database
 no manual GLB version suffixes
+admin-only Assignment States persist viewport assemblies
+legacy configurations table left unused
 ```
 
 ---
@@ -958,7 +968,7 @@ Use semantic asset keys instead of hardcoded paths.
 
 Let Houdini own geometry placement.
 
-Let the backend resolve configurations.
+Let the backend resolve assemblies and finish schemes.
 
 Let Three.js remain a simple renderer.
 

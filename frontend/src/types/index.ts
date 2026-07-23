@@ -17,7 +17,6 @@ export interface Material {
   roughness_texture_path: string | null;
 }
 
-// Full material record used by the material manager (includes status).
 export interface MaterialAdmin extends Material {
   is_active: boolean;
 }
@@ -35,7 +34,6 @@ export interface MaterialCreate {
   is_active?: boolean;
 }
 
-// All fields optional for a partial update; `code` may be renamed.
 export type MaterialUpdate = Partial<MaterialCreate>;
 
 // --------------------------------------------------------------------------- //
@@ -62,7 +60,6 @@ export interface FinishSchemeCreate {
   sort_order?: number;
 }
 
-// `code` is read-only after creation, so it is not part of the update payload.
 export interface FinishSchemeUpdate {
   display_name?: string;
   description?: string | null;
@@ -108,6 +105,7 @@ export interface ResolvedAssignments {
 // Catalog
 // --------------------------------------------------------------------------- //
 export interface ModuleType {
+  module_type_id: number;
   code: string;
   display_name: string;
 }
@@ -125,12 +123,70 @@ export interface Catalog {
 }
 
 // --------------------------------------------------------------------------- //
+// Assignment states
+// --------------------------------------------------------------------------- //
+export interface AssignmentStateModule {
+  assignment_state_module_id: number;
+  slot_number: number;
+  module_type_id: number;
+  module_type_code: string;
+  module_type_display_name: string;
+}
+
+export interface AssignmentStateModuleInput {
+  slot_number: number;
+  module_type_id: number;
+}
+
+export interface AssignmentState {
+  assignment_state_id: number;
+  assignment_state_code: string;
+  display_name: string;
+  gang_count: number;
+  default_finish_scheme_id: number | null;
+  default_finish_scheme_code: string | null;
+  notes: string | null;
+  is_active: boolean;
+  sort_order: number;
+  modules: AssignmentStateModule[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignmentStateCreate {
+  display_name: string;
+  gang_count: number;
+  default_finish_scheme_id?: number | null;
+  notes?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+  modules: AssignmentStateModuleInput[];
+}
+
+export interface AssignmentStateUpdate {
+  display_name?: string;
+  gang_count?: number;
+  default_finish_scheme_id?: number | null;
+  notes?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+  modules?: AssignmentStateModuleInput[];
+}
+
+// --------------------------------------------------------------------------- //
 // Resolved render state
 // --------------------------------------------------------------------------- //
-export interface ResolvedConfiguration {
-  gang_count: number;
+export interface ResolvedSlotModule {
+  slot_number: number;
   module_type: string;
+}
+
+export interface ResolvedAssembly {
+  gang_count: number;
+  modules: ResolvedSlotModule[];
   finish_scheme: string;
+  assignment_state_code: string | null;
+  assignment_state_display_name: string | null;
 }
 
 export interface ResolvedAsset {
@@ -147,33 +203,16 @@ export interface BomLine {
 
 export interface RenderState {
   is_valid: boolean;
-  configuration: ResolvedConfiguration;
+  assembly: ResolvedAssembly;
   active_sources: string[];
-  // binding name -> render material code
   material_assignments: Record<string, string>;
-  // render material code -> full material definition
   materials: Record<string, Material>;
   assets: ResolvedAsset[];
   bom: BomLine[];
 }
 
-export interface ConfigurationRequest {
+export interface RenderResolveRequest {
   gang_count: number;
-  module_type: string;
+  modules: ResolvedSlotModule[];
   finish_scheme: string;
-}
-
-export interface ConfigurationSummary {
-  configuration_id: number;
-  configuration_code: string;
-  gang_count: number;
-  module_type_code: string;
-  finish_scheme_code: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ConfigurationDetail {
-  configuration: ConfigurationSummary;
-  render_state: RenderState;
 }

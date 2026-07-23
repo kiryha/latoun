@@ -1,7 +1,7 @@
 // Internal Assignments admin: finish schemes, semantic binding rows, and a
-// live preview. With no configuration loaded, the material hero is shown.
-// Selecting a saved configuration loads real assembly geometry; materials
-// always come from the finish scheme being edited.
+// live preview. With no assembly state selected, the material hero is shown.
+// Selecting an Assembly State loads assembly geometry; materials always come
+// from the finish scheme being edited.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
@@ -9,7 +9,7 @@ import { Banner } from "../components/Banner";
 import { MaterialPreview } from "../materials/MaterialPreview";
 import { Scene } from "../three/Scene";
 import type {
-  ConfigurationSummary,
+  AssignmentState,
   FinishScheme,
   FinishSchemeCreate,
   MaterialAdmin,
@@ -72,10 +72,10 @@ export function AssignmentsManager() {
   const [resolvedPreview, setResolvedPreview] = useState<RenderState | null>(null);
   const [discoveredBindings, setDiscoveredBindings] = useState<string[]>([]);
   const [missingBindings, setMissingBindings] = useState<string[]>([]);
-  const [savedConfigurations, setSavedConfigurations] = useState<
-    ConfigurationSummary[]
-  >([]);
-  const [previewConfigId, setPreviewConfigId] = useState<number | null>(null);
+  const [assignmentStates, setAssignmentStates] = useState<AssignmentState[]>([]);
+  const [previewAssignmentStateId, setPreviewAssignmentStateId] = useState<
+    number | null
+  >(null);
 
   const [loading, setLoading] = useState(true);
   const [savingScheme, setSavingScheme] = useState(false);
@@ -97,14 +97,14 @@ export function AssignmentsManager() {
   const loadSchemes = useCallback(async (selectAfterId?: number) => {
     setLoading(true);
     try {
-      const [schemeList, materialList, savedList] = await Promise.all([
+      const [schemeList, materialList, stateList] = await Promise.all([
         api.listFinishSchemes(),
         api.listMaterials(),
-        api.listConfigurations(),
+        api.listAssignmentStates({ isActive: true }),
       ]);
       setSchemes(schemeList);
       setMaterials(materialList);
-      setSavedConfigurations(savedList);
+      setAssignmentStates(stateList);
 
       const target =
         (selectAfterId !== undefined &&
@@ -330,22 +330,14 @@ export function AssignmentsManager() {
     }
   };
 
-  const handleLoadPreviewConfig = (configurationId: number | null) => {
-    setPreviewConfigId(configurationId);
-    if (configurationId === null) {
+  const handleLoadPreviewAssignmentState = (assignmentStateId: number | null) => {
+    setPreviewAssignmentStateId(assignmentStateId);
+    if (assignmentStateId === null) {
       setResolvedPreview(null);
       setDiscoveredBindings([]);
       setMissingBindings([]);
     }
   };
-
-  const previewConfig = useMemo(
-    () =>
-      savedConfigurations.find(
-        (config) => config.configuration_id === previewConfigId,
-      ) ?? null,
-    [savedConfigurations, previewConfigId],
-  );
 
   // Hero material for the "None" preview: prefer primary_metal, else first row.
   const heroMaterial = useMemo(() => {
@@ -364,10 +356,10 @@ export function AssignmentsManager() {
     );
   }, [assignmentDrafts, materials, activeMaterials]);
 
-  // Assembly preview: resolve only when a saved configuration is selected.
-  // Materials always follow the finish scheme being edited.
+  // Assembly preview: geometry from Assembly State; materials from the
+  // finish scheme currently being edited.
   useEffect(() => {
-    if (isNewScheme || !selectedScheme || !previewConfig) {
+    if (isNewScheme || !selectedScheme || previewAssignmentStateId === null) {
       setResolvedPreview(null);
       setResolvingPreview(false);
       return;
@@ -382,11 +374,10 @@ export function AssignmentsManager() {
     (async () => {
       setResolvingPreview(true);
       try {
-        const resolved = await api.resolveConfiguration({
-          gang_count: previewConfig.gang_count,
-          module_type: previewConfig.module_type_code,
-          finish_scheme: selectedScheme.code,
-        });
+        const resolved = await api.resolveAssignmentStateRender(
+          previewAssignmentStateId,
+          selectedScheme.code,
+        );
         if (!cancelled) {
           setResolvedPreview(resolved);
           setError(null);
@@ -404,7 +395,12 @@ export function AssignmentsManager() {
     return () => {
       cancelled = true;
     };
-  }, [selectedScheme, isNewScheme, savedAssignments, previewConfig]);
+  }, [
+    selectedScheme,
+    isNewScheme,
+    savedAssignments,
+    previewAssignmentStateId,
+  ]);
 
   const bindingStatus = useMemo(() => {
     if (!resolvedPreview) return new Map<string, BindingResolution>();
@@ -804,25 +800,27 @@ export function AssignmentsManager() {
         {!isNewScheme && selectedScheme && (
           <div className="preview-toolbar">
             <div className="preview-toolbar-row">
-              <label className="option-label" htmlFor="preview-saved-config">
-                Load configuration
+              <label className="option-label" htmlFor="preview-assignment-state">
+                Assembly State
               </label>
               <select
-                id="preview-saved-config"
+                id="preview-assignment-state"
                 className="text-input"
-                value={previewConfigId ?? ""}
+                value={previewAssignmentStateId ?? ""}
                 onChange={(event) => {
                   const value = event.target.value;
-                  handleLoadPreviewConfig(value ? Number(value) : null);
+                  handleLoadPreviewAssignmentState(
+                    value ? Number(value) : null,
+                  );
                 }}
               >
                 <option value="">None</option>
-                {savedConfigurations.map((config) => (
+                {assignmentStates.map((state) => (
                   <option
-                    key={config.configuration_id}
-                    value={config.configuration_id}
+                    key={state.assignment_state_id}
+                    value={state.assignment_state_id}
                   >
-                    {config.configuration_code}
+                    {state.display_name}
                   </option>
                 ))}
               </select>
@@ -839,7 +837,7 @@ export function AssignmentsManager() {
             <div className="viewport-message">
               Activate this finish scheme to preview with the assembly resolver.
             </div>
-          ) : previewConfigId === null ? (
+          ) : previewAssignmentStateId === null ? (
             heroMaterial ? (
               <MaterialPreview material={heroMaterial} />
             ) : (

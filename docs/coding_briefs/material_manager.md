@@ -22,7 +22,7 @@ The Material Manager lives beside the existing configurator behind a top-level
 tab bar:
 
 ```text
-Assembly | Materials
+Assembly | Materials | Assignment States | Assignments
 ```
 
 Read `docs/configurator.md` first. This brief extends that system and reuses its
@@ -46,7 +46,7 @@ The user must be able to:
    `anisotropy_rotation`, and the `is_active` flag.
 6. See the edited material update in a live 3D preview immediately.
 7. Save changes (create or update) to the SQLite database.
-8. Delete a material that is not referenced by any saved configuration.
+8. Delete a material that is not referenced by any `material_assignments` row.
 
 Switching a material in the configurator's `Assembly` tab continues to read
 these parameters live from the database.
@@ -140,7 +140,7 @@ schema change was required.
 
 ```text
 material_id
-code                    stable machine identifier (renamable via cascade)
+code                    stable machine identifier (renamable; assignments use material_id)
 display_name
 base_color              hex string "#RRGGBB"
 metalness               0.0 – 1.0
@@ -191,8 +191,9 @@ Body: `MaterialUpdate` (all fields optional; partial update). The URL carries th
 ```text
 - Unknown material            -> 404
 - Renaming to an existing code -> 409
-- Rename cascades material_code in all referencing saved configurations
 ```
+
+Assignments reference materials by foreign key (`material_id`), so a code rename needs no cascade.
 
 ## Delete Material
 
@@ -200,8 +201,8 @@ Body: `MaterialUpdate` (all fields optional; partial update). The URL carries th
 DELETE /api/materials/{code}
 ```
 
-Returns the deleted material. Refused with `409` if any saved configuration
-still references the material (referential-integrity guard).
+Returns the deleted material. Refused with `409` if any `material_assignments`
+row still references the material (referential-integrity guard).
 
 ---
 
@@ -211,7 +212,7 @@ The `Materials` tab uses a three-column master–detail layout.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│ Assembly | Materials                                          │
+│ Assembly | Materials | Assignment States | Assignments       │
 ├───────────────┬──────────────────────────┬───────────────────┤
 │ MATERIALS +New│ Code        [__________] │                   │
 │  ▪ Brass      │ Display name[__________] │                   │
@@ -320,12 +321,11 @@ The preview updates immediately as parameters change.
 
 # 12. Referential Integrity
 
-Saved configurations reference materials by `code`.
+Materials are referenced by `material_assignments` rows (finish scheme + binding → material).
 
 ```text
-Delete:  refused (409) if any configuration references the material.
-Rename:  material_code is cascaded to all referencing configurations in the
-         same transaction, so saved configurations remain valid and resolvable.
+Delete:  refused (409) if any material_assignments row references the material.
+Rename:  no cascade required; assignments reference material_id, not code.
 ```
 
 ---
@@ -360,9 +360,8 @@ partial update preserves untouched fields
 update of missing material -> 404
 rename code updates the record and the list
 rename to an existing code -> 409
-rename cascades to referencing saved configurations
 delete of an unreferenced material succeeds
-delete of a referenced material -> 409
+delete of a material referenced by material_assignments -> 409
 ```
 
 Verify manually:
@@ -372,7 +371,7 @@ list renders with swatches and codes
 selecting a material loads editor + preview
 sliders and color update the preview live
 create / rename / delete round-trip through the DB
-renamed material still loads its saved configurations in the Assembly tab
+renamed material still resolves correctly in Assignments-tab previews
 ```
 
 ---
@@ -400,18 +399,18 @@ Texture fields are stored but not yet consumed by `three/materials.ts`.
 
 The iteration is complete when:
 
-1. A `Materials` tab sits beside `Assembly` in the app shell.
+1. A `Materials` tab sits beside `Assembly`, `Assignment States`, and `Assignments` in the app shell.
 2. The material list loads from `GET /api/materials` and shows all materials.
 3. A material can be created with a unique, sanitized code.
 4. A material's `code` and `display_name` can be renamed.
-5. Renaming cascades to referencing saved configurations.
+5. Renaming does not require cascading to other tables (assignments use `material_id`).
 6. All render parameters can be edited within their valid ranges.
 7. The live preview applies the edited material to `material_hero.glb` under the
    shared HDRI and tone mapping, updating immediately.
 8. Changes persist to SQLite and are reflected in the Assembly tab.
-9. A referenced material cannot be deleted; an unreferenced one can.
+9. A material referenced by `material_assignments` cannot be deleted; an unreferenced one can.
 10. Invalid input is rejected by the backend with a clear message.
 11. No material parameters are hardcoded in React components.
 
 The purpose is to prove that materials can be maintained live from the UI while
-keeping the database authoritative and saved configurations valid.
+keeping the database authoritative and material assignments valid.

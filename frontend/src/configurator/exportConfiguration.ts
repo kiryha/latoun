@@ -1,32 +1,24 @@
-// Builds and downloads the active configuration as a JSON file.
+// Builds and downloads the active assembly as a JSON file.
 
 import type { RenderState } from "../types";
 
-export function buildExportPayload(
-  renderState: RenderState,
-  configurationCode: string | null,
-) {
+export function buildExportPayload(renderState: RenderState) {
   return {
-    configuration_code: configurationCode ?? null,
-    gang_count: renderState.configuration.gang_count,
-    module_type: renderState.configuration.module_type,
-    finish_scheme: renderState.configuration.finish_scheme,
+    gang_count: renderState.assembly.gang_count,
+    modules: renderState.assembly.modules,
+    finish_scheme: renderState.assembly.finish_scheme,
+    assignment_state_code: renderState.assembly.assignment_state_code,
     assets: renderState.assets.map((asset) => asset.asset_key),
-    // Resolved mapping is included for debugging / reproducibility; the
-    // database stores only the semantic configuration (finish scheme + module).
     resolved_material_assignments: renderState.material_assignments,
     prototype_bom: renderState.bom,
   };
 }
 
-export function downloadConfigurationJson(
-  renderState: RenderState,
-  configurationCode: string | null,
-) {
-  const payload = buildExportPayload(renderState, configurationCode);
-  const fileName = configurationCode
-    ? `${configurationCode}.json`
-    : "latoun_configuration_draft.json";
+export function downloadAssemblyJson(renderState: RenderState) {
+  const payload = buildExportPayload(renderState);
+  const fileName = renderState.assembly.assignment_state_code
+    ? `${renderState.assembly.assignment_state_code}.json`
+    : "latoun_assembly_draft.json";
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",

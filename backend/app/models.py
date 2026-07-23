@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for the v0.1 configurator.
+"""SQLAlchemy ORM models for the Latoun configurator.
 
 Entities modeled in this iteration:
 
@@ -8,10 +8,8 @@ Entities modeled in this iteration:
   the hidden internal ``init`` scheme that holds static assignments.
 * ``material_assignments`` — the authoritative mapping
   ``finish_scheme + binding_name -> render_material``.
-* ``configurations`` — saved semantic product states.
-
-Product logic is intentionally kept in the database / services layer rather
-than in the frontend.
+* ``assignment_states`` / ``assignment_state_modules`` — admin-only viewport
+  assembly definitions ("Assembly States") for the Assignments tab.
 """
 
 from __future__ import annotations
@@ -78,7 +76,7 @@ class FinishScheme(Base):
     """A customer-visible finish selection that resolves multiple materials.
 
     The hidden ``init`` scheme (``is_customer_visible = False``) carries static
-    assignments shared by every configuration. Customer schemes overlay ``init``.
+    assignments shared by every assembly. Customer schemes overlay ``init``.
     """
 
     __tablename__ = "finish_schemes"
@@ -144,25 +142,75 @@ class MaterialAssignment(Base):
     )
 
 
-class Configuration(Base):
-    """A saved semantic configuration.
+class AssignmentState(Base):
+    """Admin-only viewport assembly definition for Assignments-tab testing.
 
-    We store only stable string codes here. Asset paths and material
-    parameters are resolved again from current product data on read, never
-    persisted, per the brief. The finish is stored as ``finish_scheme_code``.
+    Owns gang count and per-slot modules (geometry). Finish schemes are chosen
+    independently at preview time; ``default_finish_scheme_id`` is only the
+    initial preview finish.
     """
 
-    __tablename__ = "configurations"
+    __tablename__ = "assignment_states"
 
-    configuration_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    configuration_code: Mapped[str] = mapped_column(
+    assignment_state_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assignment_state_code: Mapped[str] = mapped_column(
         String(32), unique=True, index=True
     )
-    gang_count: Mapped[int] = mapped_column(Integer, default=1)
-    module_type_code: Mapped[str] = mapped_column(String(64))
-    finish_scheme_code: Mapped[str] = mapped_column(String(64))
+    display_name: Mapped[str] = mapped_column(String(128))
+    gang_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    default_finish_scheme_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("finish_schemes.finish_scheme_id"),
+        nullable=True,
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_utcnow, onupdate=_utcnow
+        DateTime, nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+    default_finish_scheme: Mapped[FinishScheme | None] = relationship()
+    modules: Mapped[list["AssignmentStateModule"]] = relationship(
+        back_populates="assignment_state",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="AssignmentStateModule.slot_number",
+    )
+
+
+class AssignmentStateModule(Base):
+    """One module placed in one slot of an assignment state."""
+
+    __tablename__ = "assignment_state_modules"
+
+    assignment_state_module_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assignment_state_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("assignment_states.assignment_state_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    slot_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    module_type_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("module_types.module_type_id"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+
+    assignment_state: Mapped["AssignmentState"] = relationship(back_populates="modules")
+    module_type: Mapped["ModuleType"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "assignment_state_id",
+            "slot_number",
+            name="uq_assignment_state_slot_number",
+        ),
+        Index("ix_assignment_state_modules_assignment_state_id", "assignment_state_id"),
+        Index("ix_assignment_state_modules_module_type_id", "module_type_id"),
     )
