@@ -9,19 +9,29 @@
       "file": "1gang_plate.glb",
       "is_active": true
     },
+    "plate.2gang": {
+      "category": "plate",
+      "gang_count": 2,
+      "file": "2gang_plate.glb",
+      "is_active": true
+    },
+    "plate.3gang": {
+      "category": "plate",
+      "gang_count": 3,
+      "file": "3gang_plate.glb",
+      "is_active": true
+    },
+    "plate.4gang": {
+      "category": "plate",
+      "gang_count": 4,
+      "file": "4gang_plate.glb",
+      "is_active": true
+    },
     "hardware.1gang.plate_screws": {
       "category": "hardware",
       "hardware_type": "plate_screws",
       "gang_count": 1,
       "file": "1gang_plate_screws.glb",
-      "is_active": true
-    },
-    "module.1gang.slot01.dimmer": {
-      "category": "slot_module",
-      "gang_count": 1,
-      "module_type": "dimmer",
-      "slot_position": 1,
-      "file": "1gang_slot01_dimmer.glb",
       "is_active": true
     },
     "module.1gang.slot01.switch": {
@@ -30,6 +40,14 @@
       "module_type": "switch",
       "slot_position": 1,
       "file": "1gang_slot01_switch.glb",
+      "is_active": true
+    },
+    "module.1gang.slot01.dimmer": {
+      "category": "slot_module",
+      "gang_count": 1,
+      "module_type": "dimmer",
+      "slot_position": 1,
+      "file": "1gang_slot01_dimmer.glb",
       "is_active": true
     }
   }
