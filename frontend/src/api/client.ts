@@ -4,6 +4,8 @@
 import type {
   AssetManifestGetResponse,
   AssetManifestSaveResponse,
+  GeometryConversionResponse,
+  GeometryPartsInventory,
   ModuleTypeOption,
 } from "../geometry/types";
 import type {
@@ -244,4 +246,13 @@ export const api = {
       `/api/wall-plates/asset-file-status?${query.toString()}`,
     );
   },
+
+  getWallPlateParts: () =>
+    request<GeometryPartsInventory>("/api/wall-plates/parts"),
+
+  convertWallPlateParts: (skipExisting: boolean) =>
+    request<GeometryConversionResponse>("/api/wall-plates/convert-parts", {
+      method: "POST",
+      body: JSON.stringify({ skip_existing: skipExisting }),
+    }),
 };

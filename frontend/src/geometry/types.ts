@@ -90,6 +90,38 @@ export interface ModuleTypeOption {
   sort_order: number;
 }
 
+export interface GeometryConversionFile {
+  source: string;
+  output: string;
+  success: boolean;
+  skipped: boolean;
+  error: string | null;
+}
+
+export interface GeometryConversionResponse {
+  total: number;
+  converted: number;
+  skipped: number;
+  failed: number;
+  files: GeometryConversionFile[];
+}
+
+export interface GeometryPartFile {
+  source: string;
+  output: string;
+  glb_exists: boolean;
+  source_size: number;
+  output_size: number | null;
+}
+
+export interface GeometryPartsInventory {
+  source_directory: string;
+  output_directory: string;
+  blender_executable: string;
+  blender_available: boolean;
+  parts: GeometryPartFile[];
+}
+
 /** Default public URL folder for GLBs (overridable via manifest properties.glb_folder). */
 export const DEFAULT_GLB_FOLDER = "/assets/wall_plates/";
 /** Back-compat alias. */

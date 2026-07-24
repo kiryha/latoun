@@ -227,6 +227,42 @@ class AssetFileStatusOut(BaseModel):
     files: dict[str, bool]
 
 
+class GeometryConversionFileOut(BaseModel):
+    source: str
+    output: str
+    success: bool
+    skipped: bool = False
+    error: str | None = None
+
+
+class GeometryConversionRequest(BaseModel):
+    skip_existing: bool = True
+
+
+class GeometryConversionOut(BaseModel):
+    total: int
+    converted: int
+    skipped: int = 0
+    failed: int
+    files: list[GeometryConversionFileOut] = Field(default_factory=list)
+
+
+class GeometryPartFileOut(BaseModel):
+    source: str
+    output: str
+    glb_exists: bool
+    source_size: int
+    output_size: int | None = None
+
+
+class GeometryPartsInventoryOut(BaseModel):
+    source_directory: str
+    output_directory: str
+    blender_executable: str
+    blender_available: bool
+    parts: list[GeometryPartFileOut] = Field(default_factory=list)
+
+
 class CatalogFinishScheme(BaseModel):
     """Customer-visible finish choice shown in the Assembly tab."""
 

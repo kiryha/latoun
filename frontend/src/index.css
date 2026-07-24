@@ -603,6 +603,7 @@ input[type="range"] {
   border: 1px solid var(--panel-border);
   background: #2b3036;
   color: var(--text);
+  font-family: inherit;
   font-size: 14px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -803,6 +804,35 @@ fieldset.option-group {
   overflow: hidden;
 }
 
+.geometry-subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--panel-border);
+  background: #1c1f23;
+  flex-shrink: 0;
+}
+
+.geometry-subtabs button {
+  padding: 8px 12px 9px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.geometry-subtabs button:hover {
+  color: var(--text);
+}
+
+.geometry-subtabs button.is-active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
 .geometry-toolbar-actions {
   display: flex;
   flex-wrap: nowrap;
@@ -825,7 +855,10 @@ fieldset.option-group {
 
 .geometry-filters .button,
 .geometry-filters .button.small,
-.geometry-filters .button.primary {
+.geometry-filters .button.primary,
+.parts-converter-toolbar .button,
+.parts-converter-toolbar .button.small,
+.parts-converter-toolbar .button.primary {
   height: 32px;
   padding: 0 12px;
   font-size: 13px;
@@ -1243,6 +1276,120 @@ fieldset.option-group {
   margin: 0;
   padding-left: 18px;
   font-size: 12px;
+}
+
+.parts-converter {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.parts-converter > .banner {
+  margin: 10px 12px 0;
+}
+
+.parts-converter-toolbar {
+  min-height: 52px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--panel-border);
+  background: #21252a;
+  box-sizing: border-box;
+}
+
+.parts-skip-existing {
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.parts-converter-toolbar .button:last-child {
+  margin-left: auto;
+}
+
+.parts-paths {
+  padding: 10px 12px;
+  display: grid;
+  gap: 7px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  font-size: 12px;
+}
+
+.parts-paths > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.parts-paths span {
+  color: var(--text-muted);
+}
+
+.parts-paths code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parts-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 12px;
+}
+
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.parts-table th,
+.parts-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--panel-border);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parts-table th {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.parts-table th:nth-child(3),
+.parts-table td:nth-child(3),
+.parts-table th:nth-child(4),
+.parts-table td:nth-child(4) {
+  width: 82px;
+}
+
+.parts-table th:nth-child(5),
+.parts-table td:nth-child(5) {
+  width: 76px;
+}
+
+.status-valid {
+  color: #9fd3ad;
+}
+
+.status-missing {
+  color: #f0b0a8;
+}
+
+.parts-loading {
+  padding: 12px;
 }
 
 .geometry-modal-backdrop {

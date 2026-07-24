@@ -17,10 +17,14 @@ from ..schemas import (
     AssetManifestSaveRequest,
     AssetManifestValidateOut,
     AssetManifestValidateRequest,
+    GeometryConversionRequest,
+    GeometryConversionOut,
+    GeometryPartsInventoryOut,
     ManifestIssueOut,
     ModuleTypeOut,
 )
 from ..services import asset_manifest_service as manifest_service
+from ..services import geometry_conversion_service
 
 router = APIRouter(prefix="/api", tags=["wall-plates"])
 
@@ -115,3 +119,29 @@ def wall_plate_asset_file_status(
 ) -> AssetFileStatusOut:
     """Return whether each public GLB path exists under frontend/public."""
     return AssetFileStatusOut(files=manifest_service.check_glb_availability(path))
+
+
+@router.post(
+    "/wall-plates/convert-parts",
+    response_model=GeometryConversionOut,
+)
+def convert_wall_plate_parts(
+    payload: GeometryConversionRequest,
+) -> GeometryConversionOut:
+    """Convert all top-level source OBJ files to same-named GLBs."""
+    return GeometryConversionOut.model_validate(
+        geometry_conversion_service.convert_all_parts(
+            skip_existing=payload.skip_existing
+        )
+    )
+
+
+@router.get(
+    "/wall-plates/parts",
+    response_model=GeometryPartsInventoryOut,
+)
+def list_wall_plate_parts() -> GeometryPartsInventoryOut:
+    """List source OBJ files and whether their same-named GLBs exist."""
+    return GeometryPartsInventoryOut.model_validate(
+        geometry_conversion_service.list_parts()
+    )

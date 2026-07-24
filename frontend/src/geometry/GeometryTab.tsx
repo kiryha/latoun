@@ -16,6 +16,7 @@ import {
   type EditableManifestEntry,
   type GangCount,
 } from "./types";
+import { PartsConverter } from "./PartsConverter";
 import { useAssetManifestEditor } from "./useAssetManifestEditor";
 
 type SortKey =
@@ -51,6 +52,7 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
     null,
   );
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<"manifest" | "parts">("manifest");
 
   useEffect(() => {
     onDirtyChange?.(editor.isDirty);
@@ -204,7 +206,33 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
       )}
 
       <div className="geometry-body">
-        <section className="geometry-table-panel" aria-label="Manifest entries">
+        <section className="geometry-table-panel" aria-label="Geometry tools">
+          <nav
+            className="geometry-subtabs"
+            role="tablist"
+            aria-label="Geometry tools"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === "manifest"}
+              className={workspace === "manifest" ? "is-active" : ""}
+              onClick={() => setWorkspace("manifest")}
+            >
+              Asset Manifest
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === "parts"}
+              className={workspace === "parts" ? "is-active" : ""}
+              onClick={() => setWorkspace("parts")}
+            >
+              Parts
+            </button>
+          </nav>
+          {workspace === "manifest" ? (
+            <>
           <div className="geometry-filters">
             <div className="geometry-toolbar-actions">
               <div className="geometry-add">
@@ -504,6 +532,10 @@ export function GeometryTab({ onDirtyChange }: GeometryTabProps) {
               </div>
             )}
           </section>
+            </>
+          ) : (
+            <PartsConverter />
+          )}
         </section>
 
         <aside className="geometry-side" aria-label="Entry editor">

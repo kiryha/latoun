@@ -28,6 +28,12 @@ class AssetManifestError(ConfiguratorError):
     status_code = 500
 
 
+class GeometryConversionError(ConfiguratorError):
+    """Blender could not start or did not return a usable conversion result."""
+
+    status_code = 500
+
+
 class MissingAssetError(ConfiguratorError):
     """A required asset key is not present in the manifest."""
 
