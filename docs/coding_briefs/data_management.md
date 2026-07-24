@@ -60,8 +60,8 @@ The current geometry assets are:
 ```text
 1gang_plate.glb
 1gang_plate_screws.glb
-1gang_slot01_dimmer.glb
-1gang_slot01_switch.glb
+1gang_slot1_dimmer.glb
+1gang_slot1_switch.glb
 ```
 
 Additional module types (`outlet`, `usb_c_outlet`) and 2?4 gang assets may be
@@ -91,9 +91,9 @@ Example assembly:
 1gang_plate.glb
 + 1gang_plate_screws.glb
 + one selected module:
-    1gang_slot01_dimmer.glb
+    1gang_slot1_dimmer.glb
     or
-    1gang_slot01_switch.glb
+    1gang_slot1_switch.glb
 ```
 
 Three.js should not calculate slot positions or module transformations during the first implementation.
@@ -115,13 +115,13 @@ It is acceptable to export slot-specific geometry instead of reusing one geometr
 For example:
 
 ```text
-2gang_slot01_switch.glb
-2gang_slot02_switch.glb
+2gang_slot1_switch.glb
+2gang_slot2_switch.glb
 
-4gang_slot01_switch.glb
-4gang_slot02_switch.glb
-4gang_slot03_switch.glb
-4gang_slot04_switch.glb
+4gang_slot1_switch.glb
+4gang_slot2_switch.glb
+4gang_slot3_switch.glb
+4gang_slot4_switch.glb
 ```
 
 This duplicates some geometry, but it removes the need for:
@@ -241,8 +241,8 @@ Short names are acceptable during the first iteration:
 ```text
 1gang_plate.glb
 1gang_plate_screws.glb
-1gang_slot01_dimmer.glb
-1gang_slot01_switch.glb
+1gang_slot1_dimmer.glb
+1gang_slot1_switch.glb
 ```
 
 These names are enough while the project supports only one market and one collection.
@@ -260,8 +260,8 @@ Examples:
 ```text
 latoun_us_mcm_1gang_plate.glb
 latoun_us_mcm_1gang_plate_screws.glb
-latoun_us_mcm_1gang_slot01_dimmer.glb
-latoun_us_mcm_1gang_slot01_switch.glb
+latoun_us_mcm_1gang_slot1_dimmer.glb
+latoun_us_mcm_1gang_slot1_switch.glb
 ```
 
 Long and explicit filenames are preferable to abbreviated or ambiguous names.
@@ -280,7 +280,7 @@ Use:
 Good:
 
 ```text
-1gang_slot01_dimmer.glb
+1gang_slot1_dimmer.glb
 ```
 
 Bad:
@@ -350,18 +350,18 @@ Example:
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.dimmer": {
+    "module.1gang.slot1.dimmer": {
       "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.switch": {
+    "module.1gang.slot1.switch": {
       "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_switch.glb",
+      "file": "/assets/glb/1gang_slot1_switch.glb",
       "coordinate_space": "assembly_origin"
     }
   }
@@ -427,9 +427,9 @@ Physical GLB path
 Example:
 
 ```text
-module.1gang.slot01.switch
+module.1gang.slot1.switch
     ?
-/assets/glb/1gang_slot01_switch.glb
+/assets/glb/1gang_slot1_switch.glb
 ```
 
 This also allows a filename to change without changing assembly-resolution logic.
@@ -443,7 +443,7 @@ A render asset does not have to represent exactly one physical BOM component.
 Example GLB:
 
 ```text
-1gang_slot01_dimmer.glb
+1gang_slot1_dimmer.glb
 ```
 
 It may contain:
@@ -501,7 +501,7 @@ The backend resolves this into:
 ```text
 plate.1gang
 hardware.1gang.plate_screws
-module.1gang.slot01.dimmer
+module.1gang.slot1.dimmer
 material.solid_brass.brushed
 ```
 
@@ -762,8 +762,8 @@ Example:
       }
     },
     {
-      "asset_key": "module.1gang.slot01.dimmer",
-      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "asset_key": "module.1gang.slot1.dimmer",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb",
       "material_binding_assignments": {
         "bind_actuator_primary": "material.solid_brass.brushed",
         "bind_actuator_collar": "material.solid_brass.brushed",
@@ -907,8 +907,8 @@ assets/
 ?   ?   ??? 1gang_plate_screws.glb
 ?   ??? modules/
 ?       ??? 1gang/
-?           ??? 1gang_slot01_dimmer.glb
-?           ??? 1gang_slot01_switch.glb
+?           ??? 1gang_slot1_dimmer.glb
+?           ??? 1gang_slot1_switch.glb
 ??? textures/
 ?   ??? metals/
 ?   ??? plastics/
@@ -948,7 +948,7 @@ Useful validation checks:
 Example error:
 
 ```text
-Asset module.1gang.slot01.dimmer is missing required binding:
+Asset module.1gang.slot1.dimmer is missing required binding:
 bind_actuator_primary
 ```
 

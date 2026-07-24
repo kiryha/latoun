@@ -152,17 +152,17 @@ Example physical files:
 ```text
 /public/assets/wall_plates/1gang_plate.glb
 /public/assets/wall_plates/1gang_plate_screws.glb
-/public/assets/wall_plates/1gang_slot01_switch.glb
-/public/assets/wall_plates/1gang_slot01_dimmer.glb
-/public/assets/wall_plates/2gang_slot01_switch.glb
-/public/assets/wall_plates/2gang_slot02_switch.glb
+/public/assets/wall_plates/1gang_slot1_switch.glb
+/public/assets/wall_plates/1gang_slot1_dimmer.glb
+/public/assets/wall_plates/2gang_slot1_switch.glb
+/public/assets/wall_plates/2gang_slot2_switch.glb
 ```
 
 Manifest paths must use public URL paths:
 
 ```text
 /assets/wall_plates/1gang_plate.glb
-/assets/wall_plates/1gang_slot01_switch.glb
+/assets/wall_plates/1gang_slot1_switch.glb
 ```
 
 The user will move the existing GLB files manually.
@@ -196,18 +196,18 @@ The current manifest is:
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.dimmer": {
+    "module.1gang.slot1.dimmer": {
       "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.switch": {
+    "module.1gang.slot1.switch": {
       "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_switch.glb",
+      "file": "/assets/glb/1gang_slot1_switch.glb",
       "coordinate_space": "assembly_origin"
     }
   }
@@ -355,9 +355,9 @@ Examples:
 ```text
 plate.1gang
 hardware.1gang.plate_screws
-module.1gang.slot01.switch
-module.1gang.slot01.dimmer
-module.2gang.slot02.outlet
+module.1gang.slot1.switch
+module.1gang.slot1.dimmer
+module.2gang.slot2.outlet
 ```
 
 The Geometry editor must display and allow editing of the manifest key.
@@ -405,17 +405,21 @@ hardware.4gang.plate_screws
 ### Slot module
 
 ```text
-module.{gang}gang.slot{slot-two-digits}.{module-type-code}
+module.{gang}gang.slot{slot}.{module-type-code}
 ```
 
 Examples:
 
 ```text
-module.1gang.slot01.switch
-module.2gang.slot01.dimmer
-module.2gang.slot02.usb_c_outlet
-module.4gang.slot04.outlet
+module.1gang.slot1.switch
+module.2gang.slot1.dimmer
+module.2gang.slot2.usb_c_outlet
+module.4gang.slot4.outlet
 ```
+
+Slot numbers are unpadded because supported assemblies have only a small,
+bounded number of slots. Legacy `slot01`–`slot04` keys remain readable; new
+entries use `slot1`–`slot4`.
 
 Do not make the application depend solely on parsing the key. The entry fields remain authoritative for asset resolution.
 
@@ -505,12 +509,12 @@ asset categories:
 ### Slot module
 
 ```json
-"module.1gang.slot01.switch": {
+"module.1gang.slot1.switch": {
   "category": "slot_module",
   "gang_count": 1,
   "module_type": "switch",
   "slot_position": 1,
-  "file": "/assets/wall_plates/1gang_slot01_switch.glb",
+  "file": "/assets/wall_plates/1gang_slot1_switch.glb",
   "is_active": true
 }
 ```
@@ -1049,13 +1053,13 @@ The duplicate must not retain the exact same manifest key.
 Suggested behavior:
 
 ```text
-module.2gang.slot01.switch
+module.2gang.slot1.switch
 ```
 
 becomes a temporary key such as:
 
 ```text
-module.2gang.slot01.switch.copy
+module.2gang.slot1.switch.copy
 ```
 
 or opens immediately with the key field requiring correction.
@@ -1188,15 +1192,15 @@ usb_c_outlet
 Example for 2-gang:
 
 ```text
-module.2gang.slot01.switch
-module.2gang.slot01.dimmer
-module.2gang.slot01.outlet
-module.2gang.slot01.usb_c_outlet
+module.2gang.slot1.switch
+module.2gang.slot1.dimmer
+module.2gang.slot1.outlet
+module.2gang.slot1.usb_c_outlet
 
-module.2gang.slot02.switch
-module.2gang.slot02.dimmer
-module.2gang.slot02.outlet
-module.2gang.slot02.usb_c_outlet
+module.2gang.slot2.switch
+module.2gang.slot2.dimmer
+module.2gang.slot2.outlet
+module.2gang.slot2.usb_c_outlet
 ```
 
 Using the four current module types, the complete generated set is:
@@ -1290,25 +1294,25 @@ Example:
 ### Slot modules
 
 ```text
-{gang}gang_slot{slot-two-digits}_{module-type-code}.glb
+{gang}gang_slot{slot}_{module-type-code}.glb
 ```
 
 Examples:
 
 ```text
-/assets/wall_plates/1gang_slot01_switch.glb
-/assets/wall_plates/2gang_slot02_dimmer.glb
-/assets/wall_plates/3gang_slot01_outlet.glb
-/assets/wall_plates/4gang_slot04_usb_c_outlet.glb
+/assets/wall_plates/1gang_slot1_switch.glb
+/assets/wall_plates/2gang_slot2_dimmer.glb
+/assets/wall_plates/3gang_slot1_outlet.glb
+/assets/wall_plates/4gang_slot4_usb_c_outlet.glb
 ```
 
-Use two-digit slots:
+Use unpadded slots:
 
 ```text
-slot01
-slot02
-slot03
-slot04
+slot1
+slot2
+slot3
+slot4
 ```
 
 Do not replace underscores in database module codes unless there is an established repository naming convention requiring it.
@@ -1453,7 +1457,7 @@ Example warning:
 
 ```text
 Could not load:
-/assets/wall_plates/3gang_slot02_outlet.glb
+/assets/wall_plates/3gang_slot2_outlet.glb
 
 The manifest entry may still be saved because geometry can be added later.
 ```
@@ -2091,20 +2095,20 @@ Example migrated manifest:
       "file": "1gang_plate_screws.glb",
       "is_active": true
     },
-    "module.1gang.slot01.dimmer": {
+    "module.1gang.slot1.dimmer": {
       "category": "slot_module",
       "gang_count": 1,
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "1gang_slot01_dimmer.glb",
+      "file": "1gang_slot1_dimmer.glb",
       "is_active": true
     },
-    "module.1gang.slot01.switch": {
+    "module.1gang.slot1.switch": {
       "category": "slot_module",
       "gang_count": 1,
       "module_type": "switch",
       "slot_position": 1,
-      "file": "1gang_slot01_switch.glb",
+      "file": "1gang_slot1_switch.glb",
       "is_active": true
     }
   }
@@ -2469,7 +2473,7 @@ generates 48 total entries from an empty manifest
 does not overwrite existing entries
 does not reset existing file paths
 does not reset is_active
-generates two-digit slot filenames
+generates unpadded slot filenames
 uses module type code in filename
 uses /assets/wall_plates/ prefix
 ```
@@ -2566,12 +2570,12 @@ No disk write occurs until Save Manifest.
 Create:
 
 ```text
-Key: module.3gang.slot02.outlet
+Key: module.3gang.slot2.outlet
 Type: Slot Module
 Gang: 3
 Slot: 2
 Module Type: Outlet
-File: /assets/wall_plates/3gang_slot02_outlet.glb
+File: /assets/wall_plates/3gang_slot2_outlet.glb
 ```
 
 Expected result:

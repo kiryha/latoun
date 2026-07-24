@@ -15,8 +15,8 @@ from ..schemas import BomLine, ResolvedAsset
 COMPONENT_DISPLAY_NAMES: dict[str, str] = {
     "plate.1gang": "1-Gang Plate",
     "hardware.1gang.plate_screws": "1-Gang Plate Screw Set",
-    "module.1gang.slot01.dimmer": "Dimmer Module",
-    "module.1gang.slot01.switch": "Switch Module",
+    "module.1gang.slot1.dimmer": "Dimmer Module",
+    "module.1gang.slot1.switch": "Switch Module",
 }
 
 _MODULE_KEY_RE = re.compile(

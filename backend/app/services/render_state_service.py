@@ -47,7 +47,7 @@ def _validate_module_type(session: Session, module_type_code: str) -> ModuleType
 
 
 def _module_asset_key(gang_count: int, slot_number: int, module_type_code: str) -> str:
-    return f"module.{gang_count}gang.slot{slot_number:02d}.{module_type_code}"
+    return f"module.{gang_count}gang.slot{slot_number}.{module_type_code}"
 
 
 def _normalize_slot_modules(

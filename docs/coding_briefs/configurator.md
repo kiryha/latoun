@@ -58,8 +58,8 @@ The following GLB files already exist:
 ```text
 1gang_plate.glb
 1gang_plate_screws.glb
-1gang_slot01_dimmer.glb
-1gang_slot01_switch.glb
+1gang_slot1_dimmer.glb
+1gang_slot1_switch.glb
 ```
 
 Outlet and USB-C Outlet module types, and all 2–4 gang assets, may be selected
@@ -74,9 +74,9 @@ A 1-gang assembly with available geometry consists of:
 1gang_plate.glb
 + 1gang_plate_screws.glb
 + selected slot module:
-    1gang_slot01_dimmer.glb
+    1gang_slot1_dimmer.glb
     or
-    1gang_slot01_switch.glb
+    1gang_slot1_switch.glb
 ```
 
 All assets are exported from Houdini in final assembly coordinates.
@@ -235,8 +235,8 @@ latoun/
 │   │       └── glb/
 │   │           ├── 1gang_plate.glb
 │   │           ├── 1gang_plate_screws.glb
-│   │           ├── 1gang_slot01_dimmer.glb
-│   │           └── 1gang_slot01_switch.glb
+│   │           ├── 1gang_slot1_dimmer.glb
+│   │           └── 1gang_slot1_switch.glb
 │   ├── src/
 │   │   ├── api/
 │   │   ├── components/
@@ -295,18 +295,18 @@ Example:
       "file": "/assets/glb/1gang_plate_screws.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.dimmer": {
+    "module.1gang.slot1.dimmer": {
       "category": "slot_module",
       "module_type": "dimmer",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb",
       "coordinate_space": "assembly_origin"
     },
-    "module.1gang.slot01.switch": {
+    "module.1gang.slot1.switch": {
       "category": "slot_module",
       "module_type": "switch",
       "slot_position": 1,
-      "file": "/assets/glb/1gang_slot01_switch.glb",
+      "file": "/assets/glb/1gang_slot1_switch.glb",
       "coordinate_space": "assembly_origin"
     }
   }
@@ -625,8 +625,8 @@ Example response (1-gang dimmer with complete assets):
       "role": "plate_screws"
     },
     {
-      "asset_key": "module.1gang.slot01.dimmer",
-      "file": "/assets/glb/1gang_slot01_dimmer.glb",
+      "asset_key": "module.1gang.slot1.dimmer",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb",
       "role": "module",
       "slot_number": 1,
       "module_type": "dimmer"
@@ -647,7 +647,7 @@ Example response (1-gang dimmer with complete assets):
       "finish_scheme": "brass"
     },
     {
-      "component_code": "module.1gang.slot01.dimmer",
+      "component_code": "module.1gang.slot1.dimmer",
       "display_name": "Dimmer Module",
       "quantity": 1,
       "finish_scheme": "brass"
@@ -908,7 +908,7 @@ Optional debug sections are nested under `debug` when a render state is availabl
     "assets": [
       "plate.1gang",
       "hardware.1gang.plate_screws",
-      "module.1gang.slot01.dimmer"
+      "module.1gang.slot1.dimmer"
     ],
     "missing_assets": [],
     "resolved_material_assignments": {

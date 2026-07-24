@@ -104,7 +104,7 @@ CORS origins, or the frontend API base URL. All values are optional.
   `uvicorn app.main:app --port 8000 --reload` from `backend/` with the venv active.
 - **"Could not load geometry"** — a GLB file is missing from
   `frontend/public/assets/wall_plates/`. The expected files are `1gang_plate.glb`,
-  `1gang_plate_screws.glb`, `1gang_slot01_dimmer.glb`, `1gang_slot01_switch.glb`.
+  `1gang_plate_screws.glb`, `1gang_slot1_dimmer.glb`, `1gang_slot1_switch.glb`.
 - **Database errors** — re-run the seed: from `backend/` with the venv active,
   `python -m app.seed`. The database is fully reproducible from the seed script.
 ```

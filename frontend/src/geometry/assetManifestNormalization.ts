@@ -18,8 +18,7 @@ export function suggestManifestKey(
   if (entry.category === "hardware") {
     return `hardware.${entry.gang_count}gang.${entry.hardware_type}`;
   }
-  const slot = String(entry.slot_position).padStart(2, "0");
-  return `module.${entry.gang_count}gang.slot${slot}.${entry.module_type}`;
+  return `module.${entry.gang_count}gang.slot${entry.slot_position}.${entry.module_type}`;
 }
 
 /** Suggested bare file name (folder lives in manifest properties.glb_folder). */
@@ -30,8 +29,7 @@ export function suggestFilePath(entry: AssetManifestEntry): string {
   if (entry.category === "hardware") {
     return `${entry.gang_count}gang_plate_screws.glb`;
   }
-  const slot = String(entry.slot_position).padStart(2, "0");
-  return `${entry.gang_count}gang_slot${slot}_${entry.module_type}.glb`;
+  return `${entry.gang_count}gang_slot${entry.slot_position}_${entry.module_type}.glb`;
 }
 
 export function createDefaultEntry(

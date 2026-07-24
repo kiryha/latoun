@@ -6,7 +6,7 @@
   "assets": [
     "plate.1gang",
     "hardware.1gang.plate_screws",
-    "module.1gang.slot01.dimmer"
+    "module.1gang.slot1.dimmer"
   ],
   "prototype_bom": [
     {
@@ -22,7 +22,7 @@
       "material": "brass"
     },
     {
-      "component_code": "module.1gang.slot01.dimmer",
+      "component_code": "module.1gang.slot1.dimmer",
       "display_name": "Rotary Dimmer Module",
       "quantity": 1,
       "material": "brass"

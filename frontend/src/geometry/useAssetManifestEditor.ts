@@ -191,7 +191,7 @@ export function useAssetManifestEditor() {
           ? "plate.1gang"
           : category === "hardware"
             ? "hardware.1gang.plate_screws"
-            : `module.1gang.slot01.${defaultModule}`;
+            : `module.1gang.slot1.${defaultModule}`;
       let key = preferredKey;
       if (liveKeys.has(key)) {
         key = uniqueCopyKey(preferredKey, liveKeys);

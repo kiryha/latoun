@@ -49,7 +49,7 @@ def test_valid_assemblies_resolve(client, module_type, finish_scheme):
     assert body["material_assignments"]["electrical_core"] == "black_plastic_matte"
 
     asset_keys = [asset["asset_key"] for asset in body["assets"]]
-    module_key = f"module.1gang.slot01.{module_type}"
+    module_key = f"module.1gang.slot1.{module_type}"
     assert "plate.1gang" in asset_keys
     assert "hardware.1gang.plate_screws" in asset_keys
 
@@ -156,8 +156,8 @@ def test_multi_gang_mixed_modules_resolve_with_warnings(client):
     ]
     missing_keys = {item["asset_key"] for item in body["missing_assets"]}
     assert "plate.2gang" in missing_keys
-    assert "module.2gang.slot01.outlet" in missing_keys
-    assert "module.2gang.slot02.dimmer" in missing_keys
+    assert "module.2gang.slot1.outlet" in missing_keys
+    assert "module.2gang.slot2.dimmer" in missing_keys
     # Missing assets must not silently substitute another device.
     assert all(
         "switch" not in item["asset_key"] for item in body["missing_assets"]

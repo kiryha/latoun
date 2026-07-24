@@ -52,7 +52,7 @@ interface AssemblyMeasurement {
 }
 
 function slotGroupName(slotNumber: number): string {
-  return `Slot_${String(slotNumber).padStart(2, "0")}`;
+  return `Slot_${slotNumber}`;
 }
 
 function Assembly({

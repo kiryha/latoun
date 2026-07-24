@@ -117,8 +117,8 @@ Current geometry assets:
 ```text
 1gang_plate.glb
 1gang_plate_screws.glb
-1gang_slot01_dimmer.glb
-1gang_slot01_switch.glb
+1gang_slot1_dimmer.glb
+1gang_slot1_switch.glb
 ```
 
 All geometry is exported from Houdini in final assembly coordinates and loaded at the origin.
@@ -1030,8 +1030,8 @@ Example response:
       "file": "/assets/glb/1gang_plate_screws.glb"
     },
     {
-      "asset_key": "module.1gang.slot01.dimmer",
-      "file": "/assets/glb/1gang_slot01_dimmer.glb"
+      "asset_key": "module.1gang.slot1.dimmer",
+      "file": "/assets/glb/1gang_slot1_dimmer.glb"
     }
   ],
   "material_assignments": {
@@ -1352,11 +1352,11 @@ primary_metal
 1gang_plate_screws.glb:
 hardware_metal
 
-1gang_slot01_dimmer.glb:
+1gang_slot1_dimmer.glb:
 actuator_metal
 electrical_core, if visible
 
-1gang_slot01_switch.glb:
+1gang_slot1_switch.glb:
 actuator_metal
 electrical_core, if visible
 ```
@@ -1418,7 +1418,7 @@ Export the structured public assembly. Geometry state names omit finish:
     "assets": [
       "plate.1gang",
       "hardware.1gang.plate_screws",
-      "module.1gang.slot01.dimmer"
+      "module.1gang.slot1.dimmer"
     ],
     "missing_assets": [],
     "resolved_material_assignments": {},

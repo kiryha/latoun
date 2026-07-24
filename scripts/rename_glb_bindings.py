@@ -34,8 +34,8 @@ _BIN_CHUNK_TYPE = 0x004E4942  # 'BIN\0'
 BINDING_BY_FILENAME: dict[str, str] = {
     "1gang_plate.glb": "primary_metal",
     "1gang_plate_screws.glb": "hardware_metal",
-    "1gang_slot01_dimmer.glb": "actuator_metal",
-    "1gang_slot01_switch.glb": "actuator_metal",
+    "1gang_slot1_dimmer.glb": "actuator_metal",
+    "1gang_slot1_switch.glb": "actuator_metal",
 }
 
 

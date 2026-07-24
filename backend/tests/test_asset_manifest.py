@@ -11,6 +11,8 @@ from app.config import settings
 from app.services import asset_manifest_service as svc
 
 
+# The padded slot names are intentional here: legacy manifests remain readable
+# even though newly generated keys and file names now use unpadded slot numbers.
 LEGACY_MANIFEST = {
     "schema_version": 2,
     "assets": {
@@ -90,12 +92,12 @@ def test_validate_valid_entries(client):
 
 def test_validate_invalid_slot(client):
     parts = {
-        "module.2gang.slot03.switch": {
+        "module.2gang.slot3.switch": {
             "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 3,
-            "file": "2gang_slot03_switch.glb",
+            "file": "2gang_slot3_switch.glb",
             "is_active": True,
         }
     }
@@ -111,20 +113,20 @@ def test_validate_invalid_slot(client):
 
 def test_validate_duplicate_active_resolver(client):
     parts = {
-        "module.2gang.slot01.switch": {
+        "module.2gang.slot1.switch": {
             "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "2gang_slot01_switch.glb",
+            "file": "2gang_slot1_switch.glb",
             "is_active": True,
         },
-        "module.2gang.slot01.switch.alt": {
+        "module.2gang.slot1.switch.alt": {
             "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "2gang_slot01_switch_alt.glb",
+            "file": "2gang_slot1_switch_alt.glb",
             "is_active": True,
         },
     }
@@ -139,20 +141,20 @@ def test_validate_duplicate_active_resolver(client):
 
 def test_inactive_duplicate_is_warning_only(client):
     parts = {
-        "module.2gang.slot01.switch": {
+        "module.2gang.slot1.switch": {
             "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "2gang_slot01_switch.glb",
+            "file": "2gang_slot1_switch.glb",
             "is_active": True,
         },
-        "module.2gang.slot01.switch.alt": {
+        "module.2gang.slot1.switch.alt": {
             "category": "slot_module",
             "gang_count": 2,
             "module_type": "switch",
             "slot_position": 1,
-            "file": "2gang_slot01_switch_alt.glb",
+            "file": "2gang_slot1_switch_alt.glb",
             "is_active": False,
         },
     }

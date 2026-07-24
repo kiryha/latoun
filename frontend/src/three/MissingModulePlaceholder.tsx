@@ -17,7 +17,7 @@ export function MissingModulePlaceholder({
   const label = `Slot ${slotNumber}\n${moduleType.split("_").join(" ")}\nmissing asset`;
 
   return (
-    <group name={`Slot_${String(slotNumber).padStart(2, "0")}_Placeholder`}>
+    <group name={`Slot_${slotNumber}_Placeholder`}>
       <mesh position={[offsetX, 0, 0]}>
         <boxGeometry args={[0.045, 0.07, 0.02]} />
         <meshStandardMaterial color="#6b727a" roughness={0.85} metalness={0.05} />

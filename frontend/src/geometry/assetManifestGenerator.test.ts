@@ -86,13 +86,13 @@ describe("assetManifestGenerator", () => {
     ).toBe(false);
   });
 
-  it("suggests bare file names with two-digit slots", () => {
+  it("suggests bare file names with unpadded slots", () => {
     const value = createDefaultEntry("slot_module", "usb_c_outlet");
     if (value.category !== "slot_module") throw new Error("expected slot");
     value.gang_count = 4;
     value.slot_position = 4;
-    expect(suggestManifestKey(value)).toBe("module.4gang.slot04.usb_c_outlet");
-    expect(suggestFilePath(value)).toBe("4gang_slot04_usb_c_outlet.glb");
+    expect(suggestManifestKey(value)).toBe("module.4gang.slot4.usb_c_outlet");
+    expect(suggestFilePath(value)).toBe("4gang_slot4_usb_c_outlet.glb");
   });
 });
 
@@ -113,12 +113,12 @@ describe("assetManifestValidation", () => {
           file: "1gang_plate_screws.glb",
           is_active: true,
         }),
-        row("module.1gang.slot01.switch", {
+        row("module.1gang.slot1.switch", {
           category: "slot_module",
           gang_count: 1,
           module_type: "switch",
           slot_position: 1,
-          file: "1gang_slot01_switch.glb",
+          file: "1gang_slot1_switch.glb",
           is_active: true,
         }),
       ],
@@ -130,12 +130,12 @@ describe("assetManifestValidation", () => {
   it("blocks slot greater than gang count", () => {
     const result = validateWorkingManifest(
       [
-        row("module.2gang.slot03.switch", {
+        row("module.2gang.slot3.switch", {
           category: "slot_module",
           gang_count: 2,
           module_type: "switch",
           slot_position: 3,
-          file: "2gang_slot03_switch.glb",
+          file: "2gang_slot3_switch.glb",
           is_active: true,
         }),
       ],
@@ -150,20 +150,20 @@ describe("assetManifestValidation", () => {
   it("blocks duplicate active resolver identity", () => {
     const result = validateWorkingManifest(
       [
-        row("module.2gang.slot01.switch", {
+        row("module.2gang.slot1.switch", {
           category: "slot_module",
           gang_count: 2,
           module_type: "switch",
           slot_position: 1,
-          file: "2gang_slot01_switch.glb",
+          file: "2gang_slot1_switch.glb",
           is_active: true,
         }),
-        row("module.2gang.slot01.switch.alt", {
+        row("module.2gang.slot1.switch.alt", {
           category: "slot_module",
           gang_count: 2,
           module_type: "switch",
           slot_position: 1,
-          file: "2gang_slot01_switch_alt.glb",
+          file: "2gang_slot1_switch_alt.glb",
           is_active: true,
         }),
       ],
@@ -175,20 +175,20 @@ describe("assetManifestValidation", () => {
   it("warns for inactive duplicates", () => {
     const result = validateWorkingManifest(
       [
-        row("module.2gang.slot01.switch", {
+        row("module.2gang.slot1.switch", {
           category: "slot_module",
           gang_count: 2,
           module_type: "switch",
           slot_position: 1,
-          file: "2gang_slot01_switch.glb",
+          file: "2gang_slot1_switch.glb",
           is_active: true,
         }),
-        row("module.2gang.slot01.switch.alt", {
+        row("module.2gang.slot1.switch.alt", {
           category: "slot_module",
           gang_count: 2,
           module_type: "switch",
           slot_position: 1,
-          file: "2gang_slot01_switch_alt.glb",
+          file: "2gang_slot1_switch_alt.glb",
           is_active: false,
         }),
       ],
