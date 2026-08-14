@@ -41,6 +41,20 @@
       "file": "2gang_plate_screws.glb",
       "is_active": true
     },
+    "hardware.3gang.plate_screws": {
+      "category": "hardware",
+      "hardware_type": "plate_screws",
+      "gang_count": 3,
+      "file": "3gang_plate_screws.glb",
+      "is_active": true
+    },
+    "hardware.4gang.plate_screws": {
+      "category": "hardware",
+      "hardware_type": "plate_screws",
+      "gang_count": 4,
+      "file": "4gang_plate_screws.glb",
+      "is_active": true
+    },
     "module.1gang.slot1.switch": {
       "category": "slot_module",
       "gang_count": 1,
@@ -55,6 +69,14 @@
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "1gang_slot1_dimmer.glb",
+      "is_active": true
+    },
+    "module.1gang.slot1outlet": {
+      "category": "slot_module",
+      "gang_count": 1,
+      "module_type": "outlet",
+      "slot_position": 1,
+      "file": "1gang_slot1_outlet.glb",
       "is_active": true
     },
     "module.2gang.slot1.switch": {
@@ -73,6 +95,14 @@
       "file": "2gang_slot1_dimmer.glb",
       "is_active": true
     },
+    "module.2gang.slot1.outlet": {
+      "category": "slot_module",
+      "gang_count": 2,
+      "module_type": "outlet",
+      "slot_position": 1,
+      "file": "2gang_slot1_outlet.glb",
+      "is_active": true
+    },
     "module.2gang.slot2.switch": {
       "category": "slot_module",
       "gang_count": 2,
@@ -87,6 +117,14 @@
       "module_type": "dimmer",
       "slot_position": 2,
       "file": "2gang_slot2_dimmer.glb",
+      "is_active": true
+    },
+    "module.2gang.slot2.outlet": {
+      "category": "slot_module",
+      "gang_count": 2,
+      "module_type": "outlet",
+      "slot_position": 2,
+      "file": "2gang_slot2_outlet.glb",
       "is_active": true
     },
     "module.3gang.slot1.switch": {
@@ -105,6 +143,14 @@
       "file": "3gang_slot1_dimmer.glb",
       "is_active": true
     },
+    "module.3gang.slot1.outlet": {
+      "category": "slot_module",
+      "gang_count": 3,
+      "module_type": "outlet",
+      "slot_position": 1,
+      "file": "3gang_slot1_outlet.glb",
+      "is_active": true
+    },
     "module.3gang.slot2.switch": {
       "category": "slot_module",
       "gang_count": 3,
@@ -119,6 +165,14 @@
       "module_type": "dimmer",
       "slot_position": 2,
       "file": "3gang_slot2_dimmer.glb",
+      "is_active": true
+    },
+    "module.3gang.slot2.outlet": {
+      "category": "slot_module",
+      "gang_count": 3,
+      "module_type": "outlet",
+      "slot_position": 2,
+      "file": "3gang_slot2_outlet.glb",
       "is_active": true
     },
     "module.3gang.slot3.switch": {
@@ -137,6 +191,14 @@
       "file": "3gang_slot3_dimmer.glb",
       "is_active": true
     },
+    "module.3gang.slot3.outlet": {
+      "category": "slot_module",
+      "gang_count": 3,
+      "module_type": "outlet",
+      "slot_position": 3,
+      "file": "3gang_slot3_outlet.glb",
+      "is_active": true
+    },
     "module.4gang.slot1.switch": {
       "category": "slot_module",
       "gang_count": 4,
@@ -151,6 +213,14 @@
       "module_type": "dimmer",
       "slot_position": 1,
       "file": "4gang_slot1_dimmer.glb",
+      "is_active": true
+    },
+    "module.4gang.slot1outlet": {
+      "category": "slot_module",
+      "gang_count": 4,
+      "module_type": "outlet",
+      "slot_position": 1,
+      "file": "4gang_slot1_outlet.glb",
       "is_active": true
     },
     "module.4gang.slot2.switch": {
@@ -169,6 +239,14 @@
       "file": "4gang_slot2_dimmer.glb",
       "is_active": true
     },
+    "module.4gang.slot2.outlet": {
+      "category": "slot_module",
+      "gang_count": 4,
+      "module_type": "outlet",
+      "slot_position": 2,
+      "file": "4gang_slot2_outlet.glb",
+      "is_active": true
+    },
     "module.4gang.slot3.switch": {
       "category": "slot_module",
       "gang_count": 4,
@@ -185,6 +263,14 @@
       "file": "4gang_slot3_dimmer.glb",
       "is_active": true
     },
+    "module.4gang.slot3.outlet": {
+      "category": "slot_module",
+      "gang_count": 4,
+      "module_type": "outlet",
+      "slot_position": 3,
+      "file": "4gang_slot3_outlet.glb",
+      "is_active": true
+    },
     "module.4gang.slot4.switch": {
       "category": "slot_module",
       "gang_count": 4,
@@ -199,6 +285,14 @@
       "module_type": "dimmer",
       "slot_position": 4,
       "file": "4gang_slot4_dimmer.glb",
+      "is_active": true
+    },
+    "module.4gang.slot4.outlet": {
+      "category": "slot_module",
+      "gang_count": 4,
+      "module_type": "outlet",
+      "slot_position": 4,
+      "file": "4gang_slot4_outlet.glb",
       "is_active": true
     }
   }
