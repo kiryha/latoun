@@ -299,7 +299,21 @@ This strict behavior prevents silent material errors.
 
 ## 7. GLB and Houdini Contract
 
-In Houdini, geometry regions will receive semantic material names through `shop_materialpath` or the equivalent GLB-export material-assignment workflow.
+Production GLBs are exported directly from Houdini. Geometry regions receive
+semantic placeholder materials through the primitive `shop_materialpath`
+attribute. The attribute must point to an existing supported material node,
+for example:
+
+```text
+/mat/primary_metal
+/mat/hardware_metal
+/mat/actuator_metal
+```
+
+Placeholder nodes may be Principled Shaders or MtlX glTF Materials. Enable
+**Export Materials** on the Houdini glTF 2.0 ROP. `Export Custom Attributes`
+does not replace material export: the runtime consumes glTF material slots,
+not a raw Houdini string attribute.
 
 Examples:
 
@@ -312,7 +326,11 @@ insulator
 label
 ```
 
-The exported GLB must preserve these values as glTF material names.
+The exported GLB must contain named glTF materials referenced by its mesh
+primitives. Houdini may export a full node path such as
+`/mat/primary_metal`; the frontend normalizes the last non-empty path segment
+to the semantic binding `primary_metal`. Plain material names from older or
+other exporters remain valid.
 
 After loading a GLB, Three.js should be able to read:
 
@@ -323,10 +341,13 @@ mesh.material.name
 Example:
 
 ```text
-mesh.material.name === "primary_metal"
+normalizeSemanticBindingName(mesh.material.name) === "primary_metal"
 ```
 
 The semantic value is stored in the GLB itself. It must not be repeated in the asset manifest.
+
+The Geometry > Parts Blender converter remains supported for existing OBJ
+inputs, but direct Houdini-to-GLB export is the primary production workflow.
 
 ---
 

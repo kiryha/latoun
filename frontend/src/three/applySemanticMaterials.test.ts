@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { applySemanticMaterials } from "./applySemanticMaterials";
+import {
+  applySemanticMaterials,
+  collectBindingNames,
+  normalizeSemanticBindingName,
+} from "./applySemanticMaterials";
 
 function meshWithBinding(binding: string): THREE.Mesh {
   const material = new THREE.MeshStandardMaterial({ color: "#ffffff" });
@@ -9,6 +13,34 @@ function meshWithBinding(binding: string): THREE.Mesh {
 }
 
 describe("applySemanticMaterials", () => {
+  it("normalizes Houdini material paths to semantic binding names", () => {
+    expect(normalizeSemanticBindingName("/mat/primary_metal")).toBe(
+      "primary_metal",
+    );
+    expect(normalizeSemanticBindingName("mat/Actuator_Metal")).toBe(
+      "actuator_metal",
+    );
+    expect(normalizeSemanticBindingName("\\mat\\silicon")).toBe("silicon");
+    expect(normalizeSemanticBindingName("primary_metal")).toBe("primary_metal");
+    expect(normalizeSemanticBindingName("  ")).toBe("");
+  });
+
+  it("resolves and reports Houdini-exported material paths by leaf name", () => {
+    const root = new THREE.Group();
+    root.add(meshWithBinding("/mat/primary_metal"));
+    const brass = new THREE.MeshStandardMaterial({ color: "#b88a44" });
+
+    const result = applySemanticMaterials(
+      root,
+      { primary_metal: "brass_brushed" },
+      new Map([["brass_brushed", brass]]),
+    );
+
+    expect(result.missingBindings).toEqual([]);
+    expect((root.children[0] as THREE.Mesh).material).toBe(brass);
+    expect(collectBindingNames(root)).toEqual(["primary_metal"]);
+  });
+
   it("applies finish assignments across every mesh", () => {
     const root = new THREE.Group();
     root.add(meshWithBinding("primary_metal"));

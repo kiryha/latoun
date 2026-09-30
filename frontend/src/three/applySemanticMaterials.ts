@@ -17,6 +17,23 @@ import { createMissingBindingMaterial } from "./materials";
 
 const SEMANTIC_BINDING_KEY = "latounSemanticBinding";
 
+/**
+ * Convert an imported glTF material name into Latoun's semantic binding key.
+ *
+ * Houdini's glTF 2.0 exporter may preserve the full material-node path (for
+ * example, `/mat/primary_metal`) as the glTF material name. Other exporters
+ * already emit the leaf name. Binding keys cannot contain path separators, so
+ * using the final non-empty segment keeps both forms interoperable.
+ */
+export function normalizeSemanticBindingName(materialName: string): string {
+  const segments = materialName
+    .trim()
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((segment) => segment.length > 0);
+  return (segments[segments.length - 1] ?? "").toLowerCase();
+}
+
 export interface MaterialApplicationResult {
   // Binding names that could not be resolved (empty name is reported as "").
   missingBindings: string[];
@@ -53,7 +70,9 @@ function bindingNameFromMaterial(
   if (stored !== null) {
     return stored;
   }
-  const bindingName = (originalMaterial.name ?? "").trim().toLowerCase();
+  const bindingName = normalizeSemanticBindingName(
+    originalMaterial.name ?? "",
+  );
   rememberBinding(mesh, slotIndex, bindingName);
   return bindingName;
 }

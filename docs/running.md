@@ -84,6 +84,28 @@ The frontend contains **no hardcoded GLB paths or material parameters**. It
 sends a semantic configuration (`gang_count`, `module_type`, `material`) and
 receives a resolved render state (material params + asset list + BOM).
 
+## Geometry asset workflow
+
+Production web geometry is exported directly from Houdini as `.glb` into
+`frontend/public/assets/wall_plates/`. In Houdini:
+
+1. Assign each geometry region a reusable placeholder material from `/mat`,
+   such as `/mat/primary_metal`, through the primitive `shop_materialpath`
+   attribute.
+2. Use a supported Principled Shader or MtlX glTF Material placeholder.
+3. Enable **Export Materials** on the Houdini glTF 2.0 ROP.
+4. Export the GLB directly to the wall-plate asset folder.
+
+Houdini may export the complete material-node path as the glTF material name.
+The frontend normalizes the final path component, so both
+`/mat/primary_metal` and `primary_metal` resolve to the semantic binding
+`primary_metal`. Placeholder appearance is ignored because the frontend
+replaces it with the material selected by the active finish scheme.
+
+The Geometry > Parts OBJ-to-GLB converter remains available as a fallback and
+for existing OBJ sources. It is not the primary production export path, and it
+must remain functional until that workflow is intentionally retired.
+
 ## Running the backend tests
 
 ```bat

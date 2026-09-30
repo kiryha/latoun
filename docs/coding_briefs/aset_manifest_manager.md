@@ -1468,10 +1468,10 @@ The manifest entry may still be saved because geometry can be added later.
 
 The preview must inspect semantic material names exported in the GLB.
 
-The current runtime semantic binding is read from:
+The current runtime semantic binding is derived from:
 
 ```typescript
-mesh.material.name
+normalizeSemanticBindingName(mesh.material.name)
 ```
 
 Display a list containing at least:
@@ -1523,14 +1523,16 @@ The critical property is:
 Semantic Material Name
 ```
 
-This corresponds to the Houdini `shop_materialpath` value as exported into the GLB material name.
+This corresponds to the leaf name of the Houdini material referenced by
+`shop_materialpath`. For example, an exported glTF material name of
+`/mat/primary_metal` is displayed and resolved as `primary_metal`.
 
 Do not imply that `shop_materialpath` survives in the GLB as a raw Houdini attribute unless the current export pipeline explicitly preserves it.
 
 In this application, inspect the resulting GLB semantic name through:
 
 ```typescript
-mesh.material.name
+normalizeSemanticBindingName(mesh.material.name)
 ```
 
 Mesh picking is desirable but secondary to:

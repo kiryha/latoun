@@ -579,28 +579,36 @@ material.stainless_steel.brushed
 
 ### 13.2 Houdini Workflow
 
-In Houdini, assign placeholder materials with stable binding names:
+Production GLBs are exported directly from Houdini. Assign reusable
+placeholder materials with stable binding names in `/mat`:
 
 ```text
-bind_plate_body
-bind_visible_screws
-bind_actuator_primary
-bind_actuator_collar
-bind_core_visible
+/mat/bind_plate_body
+/mat/bind_visible_screws
+/mat/bind_actuator_primary
+/mat/bind_actuator_collar
+/mat/bind_core_visible
 ```
 
 The placeholder materials can use diagnostic colors. Their Houdini appearance is not important.
 
 The important data is the material name.
 
-During GLB export, these assignments become named glTF materials associated with mesh primitives.
+Assign the material paths through the primitive `shop_materialpath` attribute
+and enable **Export Materials** on the Houdini glTF 2.0 ROP. During direct GLB
+export, these assignments become named glTF materials associated with mesh
+primitives. The frontend uses the last material-path component as the binding,
+so `/mat/bind_plate_body` becomes `bind_plate_body`.
+
+The Geometry > Parts Blender OBJ-to-GLB converter remains intact as a fallback
+for legacy OBJ sources; it is not the primary production geometry path.
 
 ### 13.3 Three.js Workflow
 
 After loading the GLB, Three.js traverses the meshes and reads:
 
 ```typescript
-mesh.material.name
+normalizeSemanticBindingName(mesh.material.name)
 ```
 
 Example:

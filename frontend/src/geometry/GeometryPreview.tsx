@@ -13,7 +13,10 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import { HDRI_PATH } from "../three/Scene";
-import { collectBindingNames } from "../three/applySemanticMaterials";
+import {
+  collectBindingNames,
+  normalizeSemanticBindingName,
+} from "../three/applySemanticMaterials";
 
 export interface SceneObjectRow {
   /** Stable unique id for React keys (Three.js uuid). */
@@ -90,7 +93,7 @@ function PreviewModel({
           ? mesh.material
           : [mesh.material];
         for (const [slotIndex, material] of materials.entries()) {
-          const name = material?.name?.trim();
+          const name = normalizeSemanticBindingName(material?.name ?? "");
           // One row-cell entry per material slot so multi-material meshes
           // surface every assignment.
           materialNames.push(

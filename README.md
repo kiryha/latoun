@@ -1442,6 +1442,12 @@ files under `frontend/public/assets/wall_plates/`. See
 and [docs/coding_briefs/data_management.md](docs/coding_briefs/data_management.md)
 for the full contract.
 
+Production GLBs are exported directly from Houdini with semantic placeholder
+materials assigned through `shop_materialpath` (for example,
+`/mat/primary_metal`). The frontend resolves the leaf material name
+(`primary_metal`) as the semantic binding. The Geometry > Parts Blender
+OBJ-to-GLB converter remains available for legacy/fallback conversion.
+
 ---
 
 # 16. API Design Draft
