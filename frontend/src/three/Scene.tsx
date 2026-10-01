@@ -166,6 +166,7 @@ function Assembly({
 
 interface BoundaryProps {
   onError: (message: string) => void;
+  resetKey: string;
   children: ReactNode;
 }
 
@@ -178,6 +179,12 @@ class R3FErrorBoundary extends Component<BoundaryProps, { hasError: boolean }> {
 
   componentDidCatch(error: Error, _info: ErrorInfo) {
     this.props.onError(error.message || "Failed to load geometry.");
+  }
+
+  componentDidUpdate(prevProps: BoundaryProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
   }
 
   render() {
@@ -288,9 +295,6 @@ export function Scene({
     ],
   );
 
-  // Remount error boundary on gang/module geometry changes only — not finish.
-  const boundaryKey = geometryEpoch;
-
   return (
     <Canvas
       shadows
@@ -305,10 +309,14 @@ export function Scene({
       <color attach="background" args={["#2b3036"]} />
 
       <Suspense fallback={<LoadingFallback />}>
-        <R3FErrorBoundary key={boundaryKey} onError={onAssetError}>
+        <R3FErrorBoundary
+          resetKey={geometryEpoch}
+          onError={onAssetError}
+        >
           {/* Sole light source: the equirectangular HDRI environment. */}
           <Environment files={HDRI_PATH} />
-          <Bounds fit clip observe margin={1.3}>
+          {/* Fit once on mount; configuration changes preserve the exact camera. */}
+          <Bounds fit clip margin={1.3}>
             <Assembly
               renderState={renderState}
               renderMaterials={renderMaterials}
