@@ -337,7 +337,7 @@ export function Scene({
 
       <OrbitControls
         makeDefault
-        enablePan={false}
+        enablePan
         enableZoom
         minDistance={0.05}
         maxDistance={3}

@@ -74,7 +74,7 @@ export function MaterialPreview({ material }: { material: Material }) {
           <PreviewModel material={material} />
         </Bounds>
       </Suspense>
-      <OrbitControls makeDefault enablePan={false} />
+      <OrbitControls makeDefault enablePan />
     </Canvas>
   );
 }
