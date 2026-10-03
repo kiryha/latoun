@@ -71,7 +71,7 @@
       "file": "1gang_slot1_dimmer.glb",
       "is_active": true
     },
-    "module.1gang.slot1outlet": {
+    "module.1gang.slot1.outlet": {
       "category": "slot_module",
       "gang_count": 1,
       "module_type": "outlet",
