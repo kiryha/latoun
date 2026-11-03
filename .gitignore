@@ -8,6 +8,7 @@ backend/__pycache__/
 # Node / frontend
 frontend/node_modules/
 frontend/dist/
+frontend/public/assets/backup/
 
 # Generated data (database is reproducible via the seed script)
 data/*.sqlite
