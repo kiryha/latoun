@@ -1,5 +1,7 @@
 # Latoun 002: dimensions, decisions and unresolved design details
 
+**Historical 002 report.** Current construction uses [assumptions_004.md](assumptions_004.md) and the explicit revised 004 dimensions.
+
 Inspection date: 2026-11-04. Units: mm unless degrees are stated.
 
 ## Classification

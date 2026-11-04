@@ -1,5 +1,7 @@
 # Latoun 002: inspection and proposed CAD structure
 
+**Superseded for current construction:** see [model_structure_004.md](model_structure_004.md). The user approved the revised 004 draft and preservation of its remaining unresolved engineering details.
+
 Status: Phase 1 inspection and modeling proposal, 2026-11-04. Product CAD has not been constructed or validated. This document is not a manufacturing release.
 
 ## Sources and workspace

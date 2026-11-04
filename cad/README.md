@@ -1,44 +1,61 @@
 # Latoun SOLIDWORKS CAD
 
-Phase 1 contains reference inspection findings, a proposed modeling structure,
-and an isolated native-feature verification script. Product parts, assemblies,
-and STEP exports have not been constructed or validated. The unattended native
-save/reopen smoke test has not passed. This work is not a manufacturing release.
+Revision 004 contains native part and assembly automation, geometry validation,
+AP214 STEP export and review-package tooling. The current construction report
+records 12 parts, two assemblies and 14 STEP exports saved and reopened, plus
+a passing native-feature smoke test. These are appearance and quotation models,
+not a manufacturing release. Validation evidence and geometry remain local in
+the ignored `output/` directory; this repository does not include those artifacts.
 
 ## Layout
 
 ```text
 cad/
   AGENTS.md                     CAD working rules
-  docs/                         Phase 1 findings and decisions
+  docs/                         Current 004 findings and historical 002 records
   scripts/verify_solidworks.py   Isolated COM native-feature smoke test
+  scripts/build_parts.py         Native revision 004 parts
+  scripts/build_assembly.py      Two static design-review assemblies
+  scripts/sw_helpers.py          Shared SOLIDWORKS COM helpers
+  scripts/profiles_004.py        Local nominal-DXF profile reader
+  scripts/validate_and_export.py Geometry checks and AP214 STEP export
+  scripts/package_review.py      Package local validated deliverables
   requirements.txt              Windows COM dependency
-  inputs/002/                   Local references (ignored)
+  inputs/004/                   Current local references (ignored)
   output/verification/          Local test records and test parts (ignored)
   output/solidworks/            Future native product files (ignored)
   output/step/                  Future STEP exports (ignored)
 ```
 
 `inputs/` and `output/` are excluded from Git in their entirety. Obtain the
-reference package separately and retain it unchanged under `inputs/002/`.
+reference package separately and retain it unchanged under `inputs/004/`.
 Cloning this repository does not provide references or historical run records.
 Keep potentially proprietary drawings, measurements and CAD geometry local.
 There is no automatic connection to the configurator's GLB asset workflow.
 
-## Phase 1 findings
+## Current findings
+
+- [Revision 004 model structure](docs/model_structure_004.md): native features,
+  assembly organization, reported validation and handoff.
+- [Revision 004 assumptions](docs/assumptions_004.md): explicit definitions,
+  cosmetic approximations and deliberately unresolved interfaces.
+- [Revision 004 inventory](docs/reference_inventory_004.md): local reference files.
+- [Automation status](docs/automation_status.md): passing smoke-test update and
+  retained troubleshooting history.
+
+The controlling plate envelope is **70 x 120 mm**, preserving other dimensions
+without globally scaling reference geometry. Revision 004 explicitly revises
+the insert reveal, switch slot and decorative-head seating. Remaining reference
+stack overlaps and absent mechanism interfaces are retained. Read the current
+model structure and assumptions before construction.
+
+## Historical Phase 1 findings
 
 - [Model structure](docs/model_structure.md): source interpretation, two proposed
   product assemblies sharing components, and a provisional manufacturing split.
 - [Assumptions and dimensions](docs/assumptions.md): explicit measurements,
   derived values, user decisions and unknowns.
 - [Reference inventory](docs/reference_inventory.md): files and archive contents.
-- [Automation status](docs/automation_status.md): verified API behavior, failed
-  and interrupted checks, and the remaining save/reopen validation work.
-
-The controlling plate envelope is **70 x 120 mm**, preserving other dimensions
-without globally scaling reference geometry. Known taper contact, switch-slot
-interference, floating decorative heads and absent mechanism interfaces remain
-unresolved. Read the model structure and assumptions before construction.
 
 The findings documents are preserved as historical Phase 1 records dated
 2026-11-04, including their original machine paths. References to
@@ -66,10 +83,9 @@ configured default part template. Check that path for the current machine.
 It generates Python bindings from the installed type libraries. Dimensions
 are expressed in mm for engineering documentation and meters at the API boundary.
 
-Before another run, read [automation status](docs/automation_status.md). Prior
-clients stalled in COM, and forced termination may have left **Input dimension
-value** disabled. Preserve any open user work before restarting SOLIDWORKS and
-check that preference. Run manually in a suitable local Windows session:
+Before another run, read [automation status](docs/automation_status.md), including
+the passing-test update and the earlier session/preference recovery notes.
+Preserve any open user work. Run manually in a suitable local Windows session:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\verify_solidworks.py
@@ -80,8 +96,9 @@ rebuild, body/feature/dimension checks, save and reopen. Each run writes to a ne
 timestamped `output/verification/` directory. A recorded intended output path
 does not prove a saved part exists. A failed or interrupted run is not a pass.
 Do not use `--inspect-session` against an unrelated active design; that diagnostic
-operates on the active document. The script has not been rerun for repository
-integration, and reliable unattended completion remains unverified.
+operates on the active document. CAD automation has not been rerun as part of
+this repository integration; the reported validation comes from the other
+agent's construction records.
 
 Reference-generation scripts under local `inputs/002/work/` require missing
 original OBJ files and an external `inspect_geometry` module as well as NumPy

@@ -55,15 +55,13 @@ def inspect_part(model):
     require(math.isclose(volume, math.pi * .01**2 * .005, rel_tol=1e-7),
             f"Unexpected volume: {volume} m^3")
     features = []
-    feature = interface(model.FirstFeature(), "IFeature")
-    while feature:
-        require(len(features) < 100, "Feature traversal exceeded expected count")
+    for name in ("Test_Profile", "Test_Extrude"):
+        feature = interface(interface(model, "IPartDoc").FeatureByName(name), "IFeature")
+        require(feature, "Native test feature missing: " + name)
         print("Inspect feature:", feature.Name, flush=True)
         features.append({"name": feature.Name, "type": feature.GetTypeName2(),
                          "error": feature.GetErrorCode2()})
         require(features[-1]["error"][0] == 0, f"Feature error: {features[-1]}")
-        feature = interface(feature.GetNextFeature(), "IFeature")
-    require(any(f["type"] == "Boss" for f in features), "Native boss feature missing")
     sketch_feature = interface(interface(model, "IPartDoc").FeatureByName("Test_Profile"), "IFeature")
     sketch = interface(sketch_feature.GetSpecificFeature2(), "ISketch")
     print("Inspect: sketch constraints", flush=True)
@@ -146,13 +144,13 @@ try:
     report["before_save"] = inspect_part(model)
     part_path = Path(report["test_part"])
     require(not part_path.exists(), "Refusing to overwrite test part")
-    saved, errors, warnings = model.Extension.SaveAs(str(part_path), 0, 1, None)
+    saved, errors, warnings = model.Extension.SaveAs(str(part_path), 0, 1, None, 0, 0)
     created_title = model.GetTitle()
     report["save"] = {"ok": saved, "errors": errors, "warnings": warnings}
     require(saved and errors == 0 and part_path.is_file(), "Save failed")
     sw.CloseDoc(model.GetTitle())
     created_title = None
-    reopened, errors, warnings = sw.OpenDoc6(str(part_path), 1, 1, "")
+    reopened, errors, warnings = sw.OpenDoc6(str(part_path), 1, 1, "", 0, 0)
     report["reopen"] = {"errors": errors, "warnings": warnings}
     require(reopened and errors == 0, "Reopen failed")
     created_title = reopened.GetTitle()

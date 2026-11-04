@@ -1,5 +1,7 @@
 # SOLIDWORKS automation prerequisite check
 
+**Update, 2026-11-04:** the stale API-created session was restarted and the corrected Python test passed. Native save/reopen, dimension values, fully defined sketch, body validity and volume are verified in `output/verification/20261104_143343/verification.json`. Revision 004 product construction is now proceeding. The earlier partial-test record below is retained as troubleshooting history, not current status.
+
 Date: 2026-11-04. **Partially verified; unattended save/reopen smoke test has not passed.** No product parts, assemblies or STEP exports have been generated.
 
 ## Confirmed
