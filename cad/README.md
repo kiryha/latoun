@@ -1,5 +1,15 @@
 # Latoun SOLIDWORKS CAD
 
+## Local workspace
+
+The repository root is `D:\projects\latoun`; add that directory to GitHub
+Desktop. Edit CAD documents and scripts directly under `D:\projects\latoun\cad`.
+The earlier `.integration-inspection` checkout has been consolidated into this
+layout. Review changes, commit to `main`, then use **Push origin** in Desktop.
+Local inputs, outputs and the CAD Python environment are retained under `cad/`
+and ignored by Git. Existing reports keep their historical absolute paths;
+new script runs resolve paths relative to the current `cad/` directory.
+
 Revision 004 contains native part and assembly automation, geometry validation,
 AP214 STEP export and review-package tooling. The current construction report
 records 12 parts, two assemblies and 14 STEP exports saved and reopened, plus
