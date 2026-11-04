@@ -1,5 +1,6 @@
 # Latoun CAD project
 
+- Never create Git commits or push anything to a remote. Leave all committing and pushing to the user.
 - CAD workspace: this `cad/` directory. Paths below are relative to it; current references are in `inputs/004` (existing plural directory). Revision 004 supersedes 002 dimensions and geometry.
 - Keep CAD work under `cad/`. Keep `inputs/` and `output/` local and ignored by Git; never stage them or copy their contents elsewhere for publication.
 - Historical Phase 1 documents retain the original workspace paths and observations. The root `us_mcm_nGang_plate.SLDPRT` was subsequently deleted by the user; do not restore it or treat it as validated output.
