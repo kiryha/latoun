@@ -1,0 +1,15 @@
+# Local reference packages and all generated CAD / verification output
+/inputs/
+/output/
+
+# CAD-only Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# SOLIDWORKS lock, temporary and backup files
+~$*
+*.sldbak
+*.swbak
+*.tmp
+*.bak
