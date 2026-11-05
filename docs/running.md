@@ -89,6 +89,13 @@ receives a resolved render state (material params + asset list + BOM).
 Production web geometry is exported directly from Houdini as `.glb` into
 `frontend/public/assets/wall_plates/`. In Houdini:
 
+This is the browser-preview workflow only. Authoritative SOLIDWORKS models,
+CAD references, validation data, and CAD documentation are owned by the
+separate work-VDI CAD project under `cad/`. Main-project agents do not modify
+that folder, and CAD-project agents do not modify the application or
+documentation outside it. Any CAD-to-web update is handled as an explicit
+handoff between the two projects.
+
 1. Assign each geometry region a reusable placeholder material from `/mat`,
    such as `/mat/primary_metal`, through the primitive `shop_materialpath`
    attribute.

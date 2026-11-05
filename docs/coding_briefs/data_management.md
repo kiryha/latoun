@@ -4,6 +4,10 @@
 
 The Latoun configurator separates product data, geometry assets, material definitions, and resolved render state.
 
+This document covers the configurator's **browser-render geometry pipeline**. It does not define or govern the native engineering CAD workflow.
+
+Native SOLIDWORKS models, CAD references, CAD automation, validation reports, and CAD-specific documentation belong to the separate CAD project under `cad/`. That project runs on the work VDI where the SOLIDWORKS license is available and follows `cad/AGENTS.md`. The ownership boundary is strict: agents working in the main Latoun project must not modify `cad/`, and agents working in the CAD project must not modify files outside `cad/`.
+
 The geometry system should remain simple. Latoun products are small compared with automotive assets, so some geometry duplication is acceptable when it removes runtime assembly complexity.
 
 The core separation is:
@@ -33,9 +37,9 @@ The manufacturing BOM structure and render asset structure do not need to match 
 
 ### 2.1 Houdini
 
-Houdini is the source of truth for geometry.
+Houdini is the preparation and export source for the current browser-render geometry pipeline. It is not the source of truth for native SOLIDWORKS engineering geometry; that authority remains with the CAD project under `cad/`.
 
-Houdini is responsible for:
+Within the web-render pipeline, Houdini is responsible for:
 
 - Modeling the parts
 - Positioning parts in final assembly coordinates
@@ -43,6 +47,8 @@ Houdini is responsible for:
 - Applying semantic placeholder materials
 - Baking transforms
 - Exporting GLB files
+
+Moving geometry between SOLIDWORKS, Houdini, and GLB is a deliberate handoff between projects. The main project must not edit CAD-owned source files to produce a web asset, and the CAD project must not directly update the configurator or its runtime asset registry. Each project prepares changes within its owned area and leaves the receiving integration to the other project.
 
 ### 2.2 GLB
 

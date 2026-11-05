@@ -16,6 +16,23 @@ The goal of this repository is to build the documentation, database, local web c
 
 > **Run the v0.1 configurator:** from the repo root run `setup_local.bat` once, then `run_local.bat`. See [docs/running.md](docs/running.md) for full instructions. The app opens at http://localhost:5173 and the API docs at http://localhost:8000/docs.
 
+## Repository and CAD Project Boundary
+
+This repository is shared by two separately operated Codex projects:
+
+- The main Latoun project owns the product model, configurator, backend, frontend, web-render assets, and documentation outside `cad/`.
+- The CAD project runs on the work VDI where the SOLIDWORKS license is available. It owns all SOLIDWORKS data, CAD references, CAD automation, validation reports, and CAD-specific documentation under `cad/`.
+
+The ownership boundary is strict. Main-project agents must not modify anything in `cad/`, and CAD-project agents must not modify anything outside `cad/`. Cross-project changes should be documented or requested for the owning project rather than applied across the boundary.
+
+Engineering CAD and browser-preview geometry are related but distinct:
+
+- `cad/` contains the authoritative native engineering models and CAD documentation.
+- `frontend/public/assets/` and `config/wall_plates/asset_manifest.json` contain application-facing GLB assets and their runtime registration.
+- Houdini may still be used to prepare or export browser-render assets, but it is not the source of truth for SOLIDWORKS engineering geometry.
+
+For CAD work, follow `cad/AGENTS.md` and the current documents under `cad/docs/`. CAD inputs and generated outputs are local working data and are intentionally kept out of the main application workflow.
+
 ---
 
 # 1. Product Summary
