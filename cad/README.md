@@ -19,10 +19,11 @@ cad/
   output/
     solidworks/   Editable parts and assemblies
     step/         Geometry for factory exchange
+    houdini/      Mesh parts for Houdini
   scripts/        Tools that build, check and export the models
   AGENTS.md       Instructions and technical notes for agents
 ```
 
 References and generated CAD files are kept locally and excluded from Git. A repository clone provides the documentation and scripts; obtain the references and models separately.
 
-Generated output contains the current native models, matching STEP files and JSON check results. Versioning is managed manually; the automation saves its work and closes its documents and SOLIDWORKS session when possible.
+Generated output contains the current native models, matching STEP files, Houdini mesh parts and JSON check results. Versioning is managed manually; the automation saves its work and closes its documents and SOLIDWORKS session when possible.

@@ -40,6 +40,14 @@ Part files use the `.SLDPRT` extension. The assemblies hold the controls in the 
 
 For factory exchange, use the corresponding assembly STEP file in `output/step/`. STEP carries the solid geometry; the SOLIDWORKS files retain the editable construction and assembly relationships. AP214 was chosen for the factory's SOLIDWORKS 2016 environment. The exports were reopened in 2026; import in 2016 has not been tested here.
 
+## Bringing parts into Houdini
+
+Use the STL files in `output/houdini/`, one per unique part, with the same base names as the SOLIDWORKS files. Load them through a File SOP. All exported parts were successfully loaded by the installed Houdini 22 geometry reader.
+
+STL was chosen because SOLIDWORKS exports it directly and Houdini reads it using its bundled STL reader ([supported formats](https://www.sidefx.com/docs/houdini/io/formats/geometry_formats.html)). These are triangulated meshes for further visual work; use the STEP files for factory exchange. The meshes carry no UVs or materials.
+
+Coordinates are preserved from the individual parts, with **one numeric unit equal to one millimeter**. STL does not store a unit definition. If your Houdini scene uses meters, apply a scale of `0.001` on import. The parts retain their own placement coordinates; placing the lever and making the second fixing head are assembly operations.
+
 ## Naming within the Latoun project
 
 The [main project](../../README.md) describes wall plates as a plate, hardware and modules placed in slots. The current [configurator assets](../../frontend/public/assets/wall_plates/) use names such as:
