@@ -11,7 +11,7 @@
 - Verify signatures against installed 2026 type libraries or official API documentation. Check return codes, rebuilds, body validity, saved files and reopen results before reporting success.
 - Use two product assemblies with shared components; the proposed manufacturing split remains provisional.
 - Revision 002 had taper contact, switch-slot interference and floating heads; these are superseded by the explicit 004 changes. Remaining 004 defects include overlapping reference stacks and absent mechanism interfaces. Do not silently repair them.
-- Product outputs belong directly in `output/solidworks` and `output/step`. Do not create revision subfolders, verification archives, previews or review ZIPs unless requested. Keep only current models and their JSON validation reports.
+- Product outputs belong directly in `output/solidworks`, `output/step` and `output/houdini`. Do not create revision subfolders, verification archives, previews or review ZIPs unless requested. Keep only current models and their JSON validation reports.
 - User authorized construction through Phase 5 on 2026-11-04. This is an early appearance/quotation model: preserve remaining 004 defects and missing interfaces; do not require manufacturing data before proceeding. Use the explicit nominal 004 geometry, including its revised reveal, slot and seated heads.
 
 ## Documentation rules
@@ -33,3 +33,5 @@
 - Datum: plate rear-face center, +Z toward the user. Actuator part Z is its local length axis; current placement rotates +25 degrees about X and translates Z by -10 mm. Rigid mates preserve this pose; named reference equations do not drive motion.
 - Cosmetic fits: stem R0.5 (sample residual about 0.019 mm); grip R1.6 (about 0.009 mm), shaped by transverse R10 cylinder. Logo simplification threshold 0.015 mm, tiny bevel omitted. Flutes interpolate 13 points per period; sampled surface deviation was about 0.0022 mm. These are approximation/check settings, not manufacturing tolerances.
 - Never overwrite existing design files without confirmation. Save completed native work and close documents opened by automation; exit SOLIDWORKS when no documents remain. Preserve unrelated pre-existing user documents. Leave unsaved failed work open only when needed for recovery, and report it. Do not leave successful runs with multiple app sessions or documents open.
+
+- `scripts/export_houdini.py` exports each native part to binary STL for Houdini, preserving coordinates and numeric millimeters. It restores STL preferences and closes its session. Check mesh envelopes and volumes against the native reports; verify import with the installed Houdini geometry reader when available. Keep one mesh per unique part, without revision suffixes.
