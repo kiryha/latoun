@@ -11,7 +11,7 @@
 - Verify signatures against installed 2026 type libraries or official API documentation. Check return codes, rebuilds, body validity, saved files and reopen results before reporting success.
 - Use two product assemblies with shared components; the proposed manufacturing split remains provisional.
 - Revision 002 had taper contact, switch-slot interference and floating heads; these are superseded by the explicit 004 changes. Remaining 004 defects include overlapping reference stacks and absent mechanism interfaces. Do not silently repair them.
-- Product outputs belong directly in `output/solidworks`, `output/step` and `output/houdini`. Do not create revision subfolders, verification archives, previews or review ZIPs unless requested. Keep only current models and their JSON validation reports.
+- Product outputs belong directly in `output/solidworks`, `output/step` and `output/stl`. Do not create revision subfolders, verification archives, previews or review ZIPs unless requested. Keep only current models and their JSON validation reports.
 - User authorized construction through Phase 5 on 2026-11-04. This is an early appearance/quotation model: preserve remaining 004 defects and missing interfaces; do not require manufacturing data before proceeding. Use the explicit nominal 004 geometry, including its revised reveal, slot and seated heads.
 
 ## Documentation rules

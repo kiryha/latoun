@@ -42,7 +42,7 @@ For factory exchange, use the corresponding assembly STEP file in `output/step/`
 
 ## Bringing parts into Houdini
 
-Use the STL files in `output/houdini/`, one per unique part, with the same base names as the SOLIDWORKS files. Load them through a File SOP. All exported parts were successfully loaded by the installed Houdini 22 geometry reader.
+Use the STL files in `output/stl/`, one per unique part, with the same base names as the SOLIDWORKS files. Load them through a File SOP. All exported parts were successfully loaded by the installed Houdini 22 geometry reader.
 
 STL was chosen because SOLIDWORKS exports it directly and Houdini reads it using its bundled STL reader ([supported formats](https://www.sidefx.com/docs/houdini/io/formats/geometry_formats.html)). These are triangulated meshes for further visual work; use the STEP files for factory exchange. The meshes carry no UVs or materials.
 

@@ -19,7 +19,7 @@ cad/
   output/
     solidworks/   Editable parts and assemblies
     step/         Geometry for factory exchange
-    houdini/      Mesh parts for Houdini
+    stl/          Mesh parts for Houdini
   scripts/        Tools that build, check and export the models
   AGENTS.md       Instructions and technical notes for agents
 ```

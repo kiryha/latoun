@@ -28,7 +28,7 @@ def check_stl(path,reference):
 
 
 def main():
-    target=ROOT/'output'/'houdini'
+    target=ROOT/'output'/'stl'
     target.mkdir(parents=True,exist_ok=True)
     references=json.loads((OUT/'parts_validation.json').read_text())
     for name in references:
