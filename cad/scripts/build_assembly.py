@@ -1,4 +1,4 @@
-"""Build the two static, natively mated Latoun 004 design-review assemblies."""
+"""Build the two static, natively mated Latoun design-review assemblies."""
 import argparse
 import json
 import math
@@ -89,23 +89,22 @@ def inspect_assembly(model, expected, expected_mates):
 
 
 def build(sw,variant):
-    name='Latoun_'+variant+'_004'
+    name='1gang_'+('switch' if variant=='Toggle' else 'dimmer')
     path=OUT/(name+'.SLDASM')
     require(not path.exists(),'Refusing to overwrite '+str(path))
-    parts=[('Common_Plate',0,0,0),('Rear_Ring',0,0,0),
-           ('Fixing_Head',0,-41.5,0),('Fixing_Head',0,41.5,0)]
+    parts=[('1gang_plate',0,0,0),('1gang_rear_ring',0,0,0),
+           ('plate_fixing_head',0,-41.5,0),('plate_fixing_head',0,41.5,0)]
     if variant=='Toggle':
-        parts += [('Switch_Insert',0,0,0),('Switch_Bezel',0,0,0),
-                  ('Switch_Stem',25,0,-10),('Switch_Grip',25,0,-10)]
+        parts += [('switch_insert',0,0,0),('switch_bezel',0,0,0),
+                  ('switch_stem',25,0,-10),('switch_grip',25,0,-10)]
     else:
-        parts += [(p,0,0,0) for p in ['Dimmer_Insert','Dimmer_Base','Dimmer_Collar','Dimmer_Grip','Dimmer_Cap']]
+        parts += [(p,0,0,0) for p in ['dimmer_insert','dimmer_base','dimmer_collar','dimmer_grip','dimmer_cap']]
     for part,_,_,_ in parts:
-        require((OUT/(part+'_004.SLDPRT')).exists(),'Part missing: '+part)
+        require((OUT/(part+'.SLDPRT')).exists(),'Part missing: '+part)
     # AddComponent5 requires the source parts to be loaded in memory.
-    loaded={p:reopen(sw,OUT/(p+'_004.SLDPRT')) for p in dict.fromkeys(t[0] for t in parts)}
+    loaded={p:reopen(sw,OUT/(p+'.SLDPRT')) for p in dict.fromkeys(t[0] for t in parts)}
     model=new_document(sw,2)
     assembly=interface(model,'IAssemblyDoc')
-    model.AddCustomInfo3('','Revision',30,'004')
     model.AddCustomInfo3('','Purpose',30,'Early appearance and quotation review; not a mechanism or manufacturing release')
     model.AddCustomInfo3('','Pose',30,'Static rigid review mates; actuator pivot Z=-10 mm, angle +25 deg')
     expected={}
@@ -113,7 +112,7 @@ def build(sw,variant):
     primary=None
     stem=None
     for part,angle,y,z in parts:
-        component=assembly.AddComponent5(str(OUT/(part+'_004.SLDPRT')),0,'',False,'',0.,0.,0.)
+        component=assembly.AddComponent5(str(OUT/(part+'.SLDPRT')),0,'',False,'',0.,0.,0.)
         require(component,'Component insertion failed: '+part)
         component.Transform2=transform(sw,angle,y,z)
         expected[component.Name2]=list(component.Transform2.ArrayData)
@@ -122,9 +121,9 @@ def build(sw,variant):
             assembly.FixComponent()
             primary=component
         else:
-            anchor=stem if part=='Switch_Grip' else primary
-            mates.append(lock_mate(model,anchor,component,'Review_Position_'+component.Name2.replace('-','_')))
-        if part=='Switch_Stem':
+            anchor=stem if part=='switch_grip' else primary
+            mates.append(lock_mate(model,anchor,component,'position_'+component.Name2.replace('-','_')))
+        if part=='switch_stem':
             stem=component
         print('  MATED',component.Name2,flush=True)
     if variant=='Toggle':
@@ -141,10 +140,6 @@ def build(sw,variant):
     result['reopened']=inspect_assembly(model,expected,mates)
     result['path']=str(path)
     (OUT/(name+'_validation.json')).write_text(json.dumps(result,indent=2))
-    model.ShowNamedView2('*Isometric',7)
-    model.ViewZoomtofit2()
-    preview=OUT/(name+'_isometric.bmp')
-    require(model.SaveBMP(str(preview),1600,1200),'Preview capture failed')
     print('VALIDATED ASSEMBLY',path.name,flush=True)
     return model
 
@@ -154,14 +149,15 @@ def main():
     parser.add_argument('--only',choices=['Toggle','Dimmer'])
     args=parser.parse_args()
     sw=connect()
+    old_prompt=sw.GetUserPreferenceToggle(10)
     faulthandler.dump_traceback_later(300,repeat=True)
     try:
         for variant in [args.only] if args.only else ['Toggle','Dimmer']:
             build(sw,variant)
     finally:
-        # Restore the user's pre-test input-dimension preference from the initial session.
-        sw.SetUserPreferenceToggle(10,True)
+        sw.SetUserPreferenceToggle(10,old_prompt)
         faulthandler.cancel_dump_traceback_later()
+        close_session(sw)
 
 
 if __name__=='__main__':

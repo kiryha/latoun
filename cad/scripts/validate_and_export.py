@@ -1,22 +1,23 @@
-"""Check saved revision 004 solids, export AP214, and reopen the exports."""
+"""Check saved saved solids, export AP214, and reopen the exports."""
 import argparse
 import json
 import math
 import faulthandler
+import sw_helpers
 from sw_helpers import *
 
 
 def validate_parts(sw):
     manifest=json.loads((OUT/'parts_validation.json').read_text())
-    envelopes={'Common_Plate':[70,120,3],'Rear_Ring':[66,116,2],
-        'Fixing_Head':[8,7,3],'Switch_Insert':[38,74,3],
-        'Switch_Bezel':[22,50,4],'Switch_Stem':[4,10,23],
-        'Switch_Grip':[10,10,20],'Dimmer_Insert':[38,74,3],
-        'Dimmer_Base':[24,24,4],'Dimmer_Collar':[14,14,5],
-        'Dimmer_Grip':[16,16,20],'Dimmer_Cap':[15,15,1.3]}
+    envelopes={'1gang_plate':[70,120,3],'1gang_rear_ring':[66,116,2],
+        'plate_fixing_head':[8,7,3],'switch_insert':[38,74,3],
+        'switch_bezel':[22,50,4],'switch_stem':[4,10,23],
+        'switch_grip':[10,10,20],'dimmer_insert':[38,74,3],
+        'dimmer_base':[24,24,4],'dimmer_collar':[14,14,5],
+        'dimmer_grip':[16,16,20],'dimmer_cap':[15,15,1.3]}
     report={}
     for name,record in manifest.items():
-        doc=reopen(sw,Path(record['path']))
+        doc=reopen(sw,OUT/(name+'.SLDPRT'))
         result=part_check(doc,[f['name'] for f in record['features']])
         bounds=result['bounds_mm']
         size=[bounds[i+3]-bounds[i] for i in range(3)]
@@ -24,7 +25,7 @@ def validate_parts(sw):
         require(error<.002,f'Envelope mismatch {name}: {size}')
         result['envelope_mm']=size
         result['envelope_error_mm']=error
-        if name=='Dimmer_Grip':
+        if name=='dimmer_grip':
             body=interface(interface(doc,'IPartDoc').GetBodies2(0,False)[0],'IBody2')
             faces=[interface(f,'IFace2') for f in body.GetFaces()]
             samples=[]
@@ -42,9 +43,10 @@ def validate_parts(sw):
             result['cosine_surface_samples']=samples
             result['max_cosine_surface_error_mm']=max(s['distance_mm'] for s in samples)
             require(result['max_cosine_surface_error_mm']<.005,'Flute phase/profile mismatch')
+        result['path']=str(OUT/(name+'.SLDPRT'))
         report[name]=result
         print('CHECKED',name,size,flush=True)
-    (OUT/'final_geometry_validation.json').write_text(json.dumps(report,indent=2))
+    (OUT/'parts_validation.json').write_text(json.dumps(report,indent=2))
     return report
 
 
@@ -66,18 +68,23 @@ def imported_solids(doc):
     return volumes
 
 
-def exports(sw,geometry):
-    target=ROOT/'output'/'step'/'004'
+def exports(sw,geometry,only=None):
+    require(not sw_helpers.initial_documents,'Export requires a session without pre-existing documents to isolate STEP imports')
+    target=ROOT/'output'/'step'
     target.mkdir(parents=True,exist_ok=True)
-    jobs=[(OUT/(n+'_004.SLDPRT'),1,[v['volume_mm3']]) for n,v in geometry.items()]
+    jobs=[(OUT/(n+'.SLDPRT'),1,[v['volume_mm3']]) for n,v in geometry.items()]
     for variant in ['Toggle','Dimmer']:
-        name='Latoun_'+variant+'_004'
+        name='1gang_'+('switch' if variant=='Toggle' else 'dimmer')
         report=json.loads((OUT/(name+'_validation.json')).read_text())
-        volumes=[geometry[Path(c['path']).stem.removesuffix('_004')]['volume_mm3']
+        volumes=[geometry[Path(c['path']).stem]['volume_mm3']
                  for c in report['reopened']['components']]
         jobs.append((OUT/(name+'.SLDASM'),2,volumes))
+    if only:
+        require(set(only)<=set(p.stem for p,_,_ in jobs),'Unknown export name')
+        jobs=[job for job in jobs if job[0].stem in only]
     old_ap=sw.GetUserPreferenceIntegerValue(75)
-    results={}
+    report_path=target/'step_validation.json'
+    results=json.loads(report_path.read_text()) if report_path.exists() else {}
     try:
         require(sw.SetUserPreferenceIntegerValue(75,214),'Cannot set STEP AP214')
         for native,kind,expected in jobs:
@@ -91,46 +98,50 @@ def exports(sw,geometry):
                 require(activated and error==0,'Cannot activate export document')
                 saved=save_new(sw,doc,step,kind)
             require('AUTOMOTIVE_DESIGN' in step.read_text(errors='replace')[:5000],'STEP is not AP214')
+            # Avoid duplicate native/imported document titles and stale part caches.
+            close_session(sw,exit_app=False)
+            require(not sw.GetDocuments(),'Native documents remained open before STEP import')
             data=sw.GetImportFileData(str(step))
-            imported,error=sw.LoadFile4(str(step),'',data,0)
-            require(imported and error==0,f'STEP reopen failed: {error}')
-            imported=interface(imported,'IModelDoc2')
-            actual=imported_solids(imported)
-            require(len(actual)==len(expected),f'STEP solid count {len(actual)} != {len(expected)}')
-            relative=abs(sum(actual)-sum(expected))/sum(expected)
-            # Loft integration can differ slightly after translation. This is
-            # a 0.01% numerical volume check, not a manufacturing tolerance.
-            require(relative<1e-4,f'STEP volume mismatch: {relative}')
-            envelope_error=None
-            if kind==1:
-                check=part_check(imported,[])
-                original=geometry[native.stem.removesuffix('_004')]['bounds_mm']
-                envelope_error=max(abs(a-b) for a,b in zip(check['bounds_mm'],original))
-                require(envelope_error<.002,'STEP envelope mismatch')
-            results[native.stem]={'path':str(step),'schema':'AP214','save':saved,
-                'reopened':True,'valid_solids':len(actual),'volume_mm3':sum(actual),
-                'relative_volume_difference':relative,'envelope_error_mm':envelope_error}
-            (target/'step_validation.json').write_text(json.dumps(results,indent=2))
-            sw.CloseDoc(imported.GetTitle())
+            try:
+                imported,error=sw.LoadFile4(str(step),'',data,0)
+                require(imported and error==0,f'STEP reopen failed: {error}')
+                imported=interface(imported,'IModelDoc2')
+                actual=imported_solids(imported)
+                require(len(actual)==len(expected),f'STEP solid count {len(actual)} != {len(expected)}')
+                relative=abs(sum(actual)-sum(expected))/sum(expected)
+                # Loft integration can differ slightly after translation. This is
+                # a 0.01% numerical volume check, not a manufacturing tolerance.
+                require(relative<1e-4,f'STEP volume mismatch: {relative}')
+                envelope_error=None
+                if kind==1:
+                    check=part_check(imported,[])
+                    original=geometry[native.stem]['bounds_mm']
+                    envelope_error=max(abs(a-b) for a,b in zip(check['bounds_mm'],original))
+                    require(envelope_error<.002,'STEP envelope mismatch')
+                results[native.stem]={'path':str(step),'schema':'AP214','save':saved,
+                    'reopened':True,'valid_solids':len(actual),'volume_mm3':sum(actual),
+                    'relative_volume_difference':relative,'envelope_error_mm':envelope_error}
+                (target/'step_validation.json').write_text(json.dumps(results,indent=2))
+            finally:
+                # Only transient STEP documents exist here; their source is saved.
+                require(sw.CloseAllDocuments(True),'Cannot close temporary STEP documents')
             print('VALIDATED STEP',step.name,flush=True)
     finally:
         sw.SetUserPreferenceIntegerValue(75,old_ap)
-    # Leave the two native review assemblies available in the SOLIDWORKS UI.
-    for variant in ['Dimmer','Toggle']:
-        doc=reopen(sw,OUT/f'Latoun_{variant}_004.SLDASM',2)
-        sw.ActivateDoc3(doc.GetTitle(),False,0,0)
-        doc.ShowNamedView2('*Isometric',7)
-        doc.ViewZoomtofit2()
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--geometry-only',action='store_true')
     parser.add_argument('--export-only',action='store_true')
+    parser.add_argument('--only',nargs='+',help='Export/check only these model basenames')
     args=parser.parse_args()
     sw=connect()
     faulthandler.dump_traceback_later(300,repeat=True)
-    geometry=json.loads((OUT/'final_geometry_validation.json').read_text()) if args.export_only else validate_parts(sw)
-    if not args.geometry_only:
-        exports(sw,geometry)
-    faulthandler.cancel_dump_traceback_later()
+    try:
+        geometry=json.loads((OUT/'parts_validation.json').read_text()) if args.export_only else validate_parts(sw)
+        if not args.geometry_only:
+            exports(sw,geometry,args.only)
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+        close_session(sw)

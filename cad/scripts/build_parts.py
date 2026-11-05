@@ -1,11 +1,11 @@
-"""Build native Latoun 004 appearance parts. No existing design is overwritten."""
+"""Build native Latoun appearance parts. No existing design is overwritten."""
 import argparse
 import faulthandler
 import json
 import math
 from pathlib import Path
 from sw_helpers import *
-from profiles_004 import simplified_loop
+from profiles import simplified_loop
 
 
 def insert(doc,switch=False):
@@ -173,10 +173,10 @@ def head(doc):
     return names+['Decorative_Cross_Recess_1_Deep']
 
 
-JOBS={'Common_Plate':plate,'Rear_Ring':ring,'Fixing_Head':head,
-      'Switch_Insert':lambda d:insert(d,True),'Switch_Bezel':bezel,
-      'Dimmer_Insert':insert,'Dimmer_Base':base,'Dimmer_Collar':collar,'Dimmer_Cap':cap,
-      'Switch_Stem':stem,'Switch_Grip':grip,'Dimmer_Grip':fluted_body}
+JOBS={'1gang_plate':plate,'1gang_rear_ring':ring,'plate_fixing_head':head,
+      'switch_insert':lambda d:insert(d,True),'switch_bezel':bezel,
+      'dimmer_insert':insert,'dimmer_base':base,'dimmer_collar':collar,'dimmer_cap':cap,
+      'switch_stem':stem,'switch_grip':grip,'dimmer_grip':fluted_body}
 
 
 def main():
@@ -193,14 +193,13 @@ def main():
     current=None
     try:
         for name in opt.only or JOBS:
-            path=OUT/(name+'_004.SLDPRT')
+            path=OUT/(name+'.SLDPRT')
             if path.exists():
                 require(name in manifest,'Existing untracked file; refusing to overwrite '+str(path))
                 print('Already saved; preserving',path.name,flush=True)
                 continue
             print('BUILD',name,flush=True)
             current=new_document(sw)
-            current.AddCustomInfo3('','Revision',30,'004')
             current.AddCustomInfo3('','Design_Status',30,'Early appearance / quotation model; unresolved interfaces preserved')
             names=JOBS[name](current)
             result=part_check(current,names)
@@ -219,6 +218,7 @@ def main():
         if current is not None:
             sw.CloseDoc(current.GetTitle())
         sw.SetUserPreferenceToggle(10,old_prompt)
+        close_session(sw)
 
 
 if __name__=='__main__':

@@ -29,16 +29,16 @@ This division lets us reuse common components and develop the controls independe
 
 ## Which files to open
 
-The current models are in `output/solidworks/004/`:
+The current models are in `output/solidworks/`:
 
 | Product | Assembly | Referenced parts |
 |---|---|---|
-| Toggle switch | `Latoun_Toggle_004.SLDASM` | `Common_Plate`, `Rear_Ring`, `Fixing_Head`, plus the four `Switch_*` parts |
-| Dimmer | `Latoun_Dimmer_004.SLDASM` | The same shared parts, plus the five `Dimmer_*` parts |
+| Toggle switch | `1gang_switch.SLDASM` | `1gang_plate`, `1gang_rear_ring`, `plate_fixing_head`, plus the four `switch_*` parts |
+| Dimmer | `1gang_dimmer.SLDASM` | The same shared parts, plus the five `dimmer_*` parts |
 
-Each part name currently ends in `_004.SLDPRT`. The assemblies hold the controls in the illustrated position so the appearance can be reviewed. Movement and functional connections will be developed with the mechanism.
+Part files use the `.SLDPRT` extension. The assemblies hold the controls in the illustrated position so the appearance can be reviewed. Movement and functional connections will be developed with the mechanism.
 
-For factory exchange, use the corresponding assembly STEP file in `output/step/004/`. STEP carries the solid geometry; the SOLIDWORKS files retain the editable construction and assembly relationships. AP214 was chosen for the factory's SOLIDWORKS 2016 environment. The exports were reopened in 2026; import in 2016 has not been tested here.
+For factory exchange, use the corresponding assembly STEP file in `output/step/`. STEP carries the solid geometry; the SOLIDWORKS files retain the editable construction and assembly relationships. AP214 was chosen for the factory's SOLIDWORKS 2016 environment. The exports were reopened in 2026; import in 2016 has not been tested here.
 
 ## Naming within the Latoun project
 
@@ -51,11 +51,11 @@ The [main project](../../README.md) describes wall plates as a plate, hardware a
 
 A configurator module can represent several physical CAD parts. Its slot number identifies placement; a reusable CAD part does not need a separate identity for each slot. Likewise, a GLB named `plate_screws` can contain multiple heads while CAD reuses one head part.
 
-### Proposed convention for the later rename
+### CAD naming convention
 
-Use lowercase names with underscores and the project's terms `plate`, `switch`, `dimmer` and `slot`. Keep design revisions in output folders rather than in every filename.
+Use lowercase names with underscores and the project's terms `plate`, `switch`, `dimmer` and `slot`. CAD filenames and output folders have no revision suffixes. Versioning is managed manually by the owner.
 
-| Purpose | Proposed example |
+| Purpose | Example |
 |---|---|
 | Complete product assembly | `1gang_switch.SLDASM` |
 | Plate sized for a layout | `1gang_plate.SLDPRT` |
@@ -63,4 +63,4 @@ Use lowercase names with underscores and the project's terms `plate`, `switch`, 
 | Reusable fixing component | `plate_fixing_head.SLDPRT` |
 | Positioned module exported for the configurator | `1gang_slot1_switch.glb` |
 
-Use a layout prefix on a component only when its geometry depends on that layout. Keep the same base name for a native model and its STEP export. These are proposed CAD extensions to the existing asset convention, not a naming standard already applied across the project. The current CAD files have not been renamed.
+Use a layout prefix on a component only when its geometry depends on that layout. Keep the same base name for a native model and its STEP export. The CAD names now follow this convention. Configurator assets keep their existing names; the two formats describe different levels of the same product.

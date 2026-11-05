@@ -6,9 +6,10 @@ import win32com.client as com
 from win32com.client import makepy
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'output' / 'solidworks' / '004'
+OUT = ROOT / 'output' / 'solidworks'
 INSTALL = Path(r'D:\programs\SOLIDWORKS\SOLIDWORKS')
 bindings = None
+initial_documents = set()
 
 
 def require(value, message):
@@ -25,7 +26,7 @@ def interface(obj, name):
 
 
 def connect():
-    global bindings
+    global bindings, initial_documents
     pythoncom.CoInitialize()
     lib = pythoncom.LoadTypeLib(str(INSTALL / 'sldworks.tlb'))
     guid, lcid, _, major, minor, _ = lib.GetLibAttr()
@@ -36,6 +37,7 @@ def connect():
         bindings = com.gencache.GetModuleForTypelib(guid, lcid, major, minor)
     sw = bindings.ISldWorks(com.Dispatch('SldWorks.Application')._oleobj_)
     require(sw.RevisionNumber().startswith('34.'), 'SOLIDWORKS 2026 required')
+    initial_documents = {(interface(d,'IModelDoc2').GetPathName(), interface(d,'IModelDoc2').GetTitle()) for d in sw.GetDocuments() or []}
     sw.Visible = True
     print('SOLIDWORKS', sw.RevisionNumber(), flush=True)
     return sw
@@ -230,3 +232,26 @@ def reopen(sw,path,kind=1):
     doc,err,warn=sw.OpenDoc6(str(path),kind,1,'',0,0)
     require(doc and err==0,f'Open failed: {path}, {err}, {warn}')
     return interface(doc,'IModelDoc2')
+
+
+def close_session(sw, exit_app=True):
+    """Save and close our native documents; leave pre-existing user documents alone."""
+    titles=[]
+    for obj in sw.GetDocuments() or []:
+        doc=interface(obj,'IModelDoc2')
+        path,title=doc.GetPathName(),doc.GetTitle()
+        if (path,title) in initial_documents:
+            continue
+        if not path:
+            print('Leaving unsaved document open for recovery:',title,flush=True)
+            continue
+        if Path(path).suffix.lower() in {'.sldprt','.sldasm'} and doc.GetSaveFlag():
+            ok,error,warning=doc.Save3(1,0,0)
+            require(ok and error==0,f'Cannot save {title} during cleanup: {error}')
+        titles.append(title)
+    # Collect names before closing: closing an assembly may also release parts.
+    for title in titles:
+        sw.CloseDoc(title)
+    if exit_app and not sw.GetDocuments():
+        sw.ExitApp()
+        print('SOLIDWORKS closed',flush=True)
