@@ -220,6 +220,7 @@ def save_new(sw,doc,path,kind=1):
     path=Path(path)
     require(not path.exists(),'Refusing to overwrite '+str(path))
     path.parent.mkdir(parents=True,exist_ok=True)
+    doc.ClearSelection2(True)
     doc.ShowNamedView2('*Isometric',7)
     doc.ViewZoomtofit2()
     ok,err,warn=doc.Extension.SaveAs(str(path),0,1,None,0,0)

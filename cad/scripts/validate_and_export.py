@@ -94,6 +94,15 @@ def exports(sw,geometry,only=None):
                 saved={'preserved_existing':True}
             else:
                 doc=reopen(sw,native,kind)
+                require(len(imported_solids(doc))==len(expected),'Native solid count before export is incorrect')
+                if kind==2:
+                    from build_assembly import inspect_assembly
+                    assembly_report=json.loads((OUT/(native.stem+'_validation.json')).read_text())
+                    checked=inspect_assembly(doc,
+                        {c['instance']:c['transform'] for c in assembly_report['reopened']['components']},
+                        [m['name'] for m in assembly_report['reopened']['mates']])
+                    assembly_report['reopened']=checked
+                    (OUT/(native.stem+'_validation.json')).write_text(json.dumps(assembly_report,indent=2))
                 activated,error=sw.ActivateDoc3(doc.GetTitle(),False,0,0)
                 require(activated and error==0,'Cannot activate export document')
                 saved=save_new(sw,doc,step,kind)
