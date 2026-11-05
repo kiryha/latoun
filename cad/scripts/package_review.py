@@ -23,7 +23,7 @@ for variant,count in [('Toggle',8),('Dimmer',9)]:
             expected[10]=c['transform'][10]
         assert max(abs(a-b) for a,b in zip(c['transform'],expected))<1e-9
 
-readme='''# Latoun revision 004 — design review / quotation
+readme='''# Latoun revision 004 â€” design review / quotation
 
 Open solidworks/Latoun_Toggle_004.SLDASM or Latoun_Dimmer_004.SLDASM
 in SOLIDWORKS 2026. Keep all 12 SLDPRT files beside the two assemblies.
@@ -38,7 +38,7 @@ Plate: 70 x 120 x 3 mm. Revised 004 references govern other dimensions.
 The draft intentionally retains stem/grip and dimmer stack overlaps.
 Shaft openings, retention, mechanisms, threads, materials and production
 tolerances remain unspecified. This is an appearance and quotation model.
-See docs/model_structure_004.md and docs/assumptions_004.md for details.
+See docs/model_structure.md and docs/assumptions.md for details.
 
 Validation: 12 valid single-solid parts, 8/9 component assembly instances,
 7/8 healthy mates, preserved positions, saved/reopened native documents,
@@ -55,7 +55,7 @@ with zipfile.ZipFile(package,'x',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
                 if p.name.startswith('~$'):
                     continue
                 z.write(p,f'{label}/{p.name}')
-    for name in ['model_structure_004.md','assumptions_004.md','reference_inventory_004.md']:
+    for name in ['model_structure.md','assumptions.md']:
         z.write(ROOT/'docs'/name,'docs/'+name)
 with zipfile.ZipFile(package) as z:
     assert z.testzip() is None
