@@ -3,9 +3,10 @@ import argparse
 import faulthandler
 import json
 import math
-from pathlib import Path
 from sw_helpers import *
 from profiles import simplified_loop
+import sw_helpers
+from model_layout import ASSETS, check_manifest
 
 
 def insert(doc,switch=False):
@@ -140,8 +141,9 @@ def fluted_body(doc):
     profile.Select2(False,1)
     path.Select2(True,4)
     sweep=doc.FeatureManager.InsertProtrusionSwept4(False,False,8,True,False,
-        0,0,False,0.,0.,0,0,True,True,True,math.radians(44.1),True,False,0.,0)
+        0,0,False,0.,0.,0,0,False,True,True,math.radians(44.1),True,False,0.,0)
     require(sweep,'Twisted cosine sweep failed').Name='Helical_Grip_Lead160'
+    remember_body(doc)
     # Thin end lofts reduce the whole radial profile by .2, as in sheet 08.
     lower=flute_profile(doc,'Lower_End_Reduced02',8,7.55)
     loft(doc,[lower,profile],'Lower_End_Break_02')
@@ -173,48 +175,115 @@ def head(doc):
     return names+['Decorative_Cross_Recess_1_Deep']
 
 
-JOBS={'1gang_plate':plate,'1gang_rear_ring':ring,'plate_fixing_head':head,
+JOBS={'1gang_plate_metal':plate,'1gang_plate_silicone':ring,'plate_fixing_head':head,
       'switch_insert':lambda d:insert(d,True),'switch_bezel':bezel,
       'dimmer_insert':insert,'dimmer_base':base,'dimmer_collar':collar,'dimmer_cap':cap,
       'switch_stem':stem,'switch_grip':grip,'dimmer_grip':fluted_body}
 
 
+BODY_JOBS={
+    '1gang_plate':['1gang_plate_metal','1gang_plate_silicone'],
+    '1gang_plate_screws':['plate_fixing_head'],
+    '1gang_slot1_switch':['switch_insert','switch_bezel','switch_stem','switch_grip'],
+    '1gang_slot1_dimmer':['dimmer_insert','dimmer_base','dimmer_collar','dimmer_grip','dimmer_cap'],
+}
+BODY_COUNTS={'1gang_plate':2,'1gang_plate_screws':2,'1gang_slot1_switch':4,'1gang_slot1_dimmer':5}
+
+
+def move_body(doc,body,name,y=0,z=0,angle=0,copy=False):
+    doc.ClearSelection2(True)
+    sd=interface(doc.SelectionManager,'ISelectionMgr').CreateSelectData()
+    sd.Mark=1
+    require(body.Select2(False,sd),'Move body selection failed')
+    f=doc.FeatureManager.InsertMoveCopyBody2(0.,y/1000,z/1000,0.,0.,0.,0.,math.radians(angle),0.,0.,copy,1)
+    require(f,'Move/copy body failed: '+name).Name=name
+    if angle:
+        # 2026 inserts these angles as Euler rotations; explicitly set Cartesian X.
+        data=interface(f.GetDefinition(),'IMoveCopyBodyFeatureData')
+        require(data.AccessSelections(doc,None),'Cannot edit body rotation')
+        data.TransformX=math.radians(angle)
+        data.TransformY=0.
+        data.TransformZ=0.
+        require(f.ModifyDefinition(data,doc,None),'Cannot set body X rotation')
+    doc.ClearSelection2(True)
+    return name
+
+
+def check_asset(doc,name,names):
+    require(doc.EditRebuild3(),'Part rebuild failed')
+    result=solid_geometry(doc)
+    require(result['solid_count']==BODY_COUNTS[name],'Incorrect body count: '+name)
+    result['features']=[]
+    for n in names:
+        f=feature(doc,n)
+        require(f,'Missing native feature '+n)
+        error,warning=f.GetErrorCode2()
+        require(error==0,'Feature rebuild error: '+n)
+        result['features'].append({'name':n,'type':f.GetTypeName2(),'error':error,'warning':warning})
+    result['body_names']=[interface(b,'IBody2').Name for b in interface(doc,'IPartDoc').GetBodies2(0,False)]
+    return result
+
+
 def main():
-    args=argparse.ArgumentParser()
-    args.add_argument('--only',nargs='*')
-    opt=args.parse_args()
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--only',nargs='+',choices=list(ASSETS))
+    opt=parser.parse_args()
+    check_manifest()
+    report_path=VALIDATION/'parts_validation.json'
+    records=json.loads(report_path.read_text()) if report_path.exists() else {}
     sw=connect()
     old_prompt=sw.GetUserPreferenceToggle(10)
     sw.SetUserPreferenceToggle(10,False)
-    OUT.mkdir(parents=True,exist_ok=True)
-    manifest_path=OUT/'parts_validation.json'
-    manifest=json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
-    faulthandler.dump_traceback_later(300,repeat=True)
     current=None
     try:
-        for name in opt.only or JOBS:
+        for name in opt.only or ASSETS:
             path=OUT/(name+'.SLDPRT')
             if path.exists():
-                require(name in manifest,'Existing untracked file; refusing to overwrite '+str(path))
-                print('Already saved; preserving',path.name,flush=True)
-                continue
-            print('BUILD',name,flush=True)
-            current=new_document(sw)
-            current.AddCustomInfo3('','Design_Status',30,'Early appearance / quotation model; unresolved interfaces preserved')
-            names=JOBS[name](current)
-            result=part_check(current,names)
-            result['save']=save_new(sw,current,path)
-            sw.CloseDoc(current.GetTitle())
-            current=reopen(sw,path)
-            result['reopened']=part_check(current,names)
-            result['path']=str(path)
-            manifest[name]=result
-            manifest_path.write_text(json.dumps(manifest,indent=2))
+                require(name in records,'Existing untracked part '+name)
+                current=reopen(sw,path)
+                names=[f['name'] for f in records[name]['features']]
+            else:
+                print('BUILD',name,flush=True)
+                current=new_document(sw)
+                current.AddCustomInfo3('','Latoun_Asset_ID',30,ASSETS[name])
+                names=[]
+                for component in BODY_JOBS[name]:
+                    begin_body(current)
+                    names+=JOBS[component](current)
+                    body=sw_helpers.active_body
+                    body.Name=component
+                    if component in ('switch_stem','switch_grip'):
+                        names.append(move_body(current,body,component+'_Angle25',angle=25))
+                        body=next(interface(b,'IBody2') for b in interface(current,'IPartDoc').GetBodies2(0,False) if interface(b,'IBody2').Name==component)
+                        names.append(move_body(current,body,component+'_Position',z=-10))
+                    if component=='plate_fixing_head':
+                        names.append(move_body(current,body,'Lower_Fixing_Position',y=-41.5))
+                        body=interface(interface(current,'IPartDoc').GetBodies2(0,False)[0],'IBody2')
+                        body.Name='lower_fixing_head'
+                        names.append(move_body(current,body,'Second_Fixing_83_Pitch',y=83,copy=True))
+                        for b in interface(current,'IPartDoc').GetBodies2(0,False):
+                            b=interface(b,'IBody2')
+                            b.Name='upper_fixing_head' if b.GetMassProperties(1.)[1]>0 else 'lower_fixing_head'
+                check_asset(current,name,names)
+                save_new(sw,current,path)
+                sw.CloseDoc(current.GetTitle())
+                current=reopen(sw,path)
+            result=dict(records.get(name,{}))
+            result.update(check_asset(current,name,names))
+            # Structural changes must preserve the previously validated asset geometry.
+            previous=VALIDATION/(name+'_validation.json')
+            if previous.exists():
+                old=json.loads(previous.read_text())['reopened']['geometry']
+                require(max(abs(a-b) for a,b in zip(old['bounds_mm'],result['bounds_mm']))<.002,'Consolidation changed bounds')
+                require(len(old['solid_volumes_mm3'])==result['solid_count'],'Consolidation changed body count')
+                require(all(abs(a-b)/a<1e-5 for a,b in zip(old['solid_volumes_mm3'],result['solid_volumes_mm3'])),'Consolidation changed body volumes')
+            result.update(path=str(path),reopened=True,asset_id=ASSETS[name])
+            records[name]=result
+            write_report('parts_validation.json',records)
             sw.CloseDoc(current.GetTitle())
             current=None
-            print('VALIDATED',name,result['bounds_mm'],flush=True)
+            print('VALIDATED',name,result['solid_count'],'bodies',flush=True)
     finally:
-        faulthandler.cancel_dump_traceback_later()
         if current is not None:
             sw.CloseDoc(current.GetTitle())
         sw.SetUserPreferenceToggle(10,old_prompt)

@@ -1,7 +1,9 @@
-"""Export native parts as binary STL meshes for Houdini, in millimeters."""
+"""Export manifest asset groups as binary STL meshes for Houdini, in millimeters."""
 import json
 import struct
 from sw_helpers import *
+from model_layout import ASSETS, check_manifest
+from build_parts import check_asset
 
 
 def check_stl(path,reference):
@@ -30,15 +32,14 @@ def check_stl(path,reference):
 def main():
     target=ROOT/'output'/'stl'
     target.mkdir(parents=True,exist_ok=True)
-    references=json.loads((OUT/'parts_validation.json').read_text())
-    for name in references:
-        require(not (target/(name+'.stl')).exists(),'Refusing to overwrite '+name)
+    check_manifest()
     sw=connect()
     settings=[('Integer',78,3),('Integer',211,0),('Double',2,.000005),
               ('Double',3,math.radians(5)),('Toggle',69,True),('Toggle',70,False),
-              ('Toggle',71,True),('Toggle',191,False)]
+              ('Toggle',71,True),('Toggle',191,False),('Toggle',72,True),('Toggle',73,False)]
     previous=[]
-    report={'units':'mm','coordinates':'native part coordinates','parts':{}}
+    report_path=VALIDATION/'mesh_validation.json'
+    report=json.loads(report_path.read_text()) if report_path.exists() else {'units':'mm','coordinates':'assembled product coordinates','assets':{}}
     try:
         for kind,key,value in settings:
             suffix=kind if kind=='Toggle' else kind+'Value'
@@ -48,20 +49,24 @@ def main():
             setter(key,value)
             actual=getter(key)
             require(abs(actual-value)<1e-10,f'STL preference {kind} {key}: requested {value}, got {actual}')
-        for name,reference in references.items():
+        for name,asset_id in ASSETS.items():
             doc=reopen(sw,OUT/(name+'.SLDPRT'))
+            record=json.loads((VALIDATION/'parts_validation.json').read_text())[name]
+            reference=check_asset(doc,name,[f['name'] for f in record['features']])
             active,error=sw.ActivateDoc3(doc.GetTitle(),False,0,0)
             require(active and error==0,'Cannot activate part')
             path=target/(name+'.stl')
-            save_new(sw,doc,path)
+            if not path.exists():
+                save_new(sw,doc,path)
             # SOLIDWORKS may capitalize STL; keep our exported names consistent.
             for actual in target.iterdir():
                 if actual.name.lower()==path.name and actual.name!=path.name:
                     actual.rename(path)
-            report['parts'][name]=check_stl(path,reference)
-            (target/'mesh_validation.json').write_text(json.dumps(report,indent=2))
-            sw.CloseDoc(doc.GetTitle())
-            print('VALIDATED MESH',name,report['parts'][name]['triangles'],flush=True)
+            report['assets'].setdefault(name,{}).update(check_stl(path,reference))
+            report['assets'][name]['asset_id']=asset_id
+            write_report('mesh_validation.json',report)
+            close_session(sw,exit_app=False)
+            print('VALIDATED MESH',name,report['assets'][name]['triangles'],flush=True)
     finally:
         for setter,key,value in reversed(previous):
             setter(key,value)

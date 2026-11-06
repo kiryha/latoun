@@ -4,11 +4,11 @@
 
 The models support appearance review and early factory quotations. We preserve the design's unresolved details so the factory can assess the intended appearance before mechanism selection drives further changes.
 
-The current reference set is `inputs/004/`. Its drawings and nominal dimension register govern the reconstruction. Dimensions belong in those references and model parameters; check results belong in the existing JSON reports under `output/`.
+The current reference set is `inputs/004/`. Its drawings and nominal dimension register govern the reconstruction. Dimensions belong in those references and model parameters; check results belong in the existing JSON reports under `output/validation/`.
 
-## Why the components are separate
+## Why solids remain separate
 
-The plate, rear ring and fixing heads are shared between products to keep their appearance consistent. Switch and dimmer components are separate so their mechanisms can evolve independently.
+The plate, silicone ring and fixing heads are shared between products to keep their appearance consistent. They are grouped into the same plate and hardware assets as the configurator. Each manifest asset is one multibody part file. Switch and dimmer components remain separate named solids within their module, so their geometry can evolve independently. Grouping does not merge their solids or decide how the factory must manufacture them.
 
 The dimmer collar remains separate from the grip because their connection is unresolved. Keeping them separate exposes the overlap for engineering review. The raised L belongs to the cap because it is a surface detail, with no specified separate attachment.
 

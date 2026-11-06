@@ -1,5 +1,6 @@
 """Small SOLIDWORKS 2026 COM helpers. Geometric arguments are millimeters."""
 import math
+import json
 from pathlib import Path
 import pythoncom
 import win32com.client as com
@@ -7,9 +8,39 @@ from win32com.client import makepy
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'output' / 'solidworks'
+VALIDATION = ROOT / 'output' / 'validation'
 INSTALL = Path(r'D:\programs\SOLIDWORKS\SOLIDWORKS')
 bindings = None
 initial_documents = set()
+active_body = None
+prior_bodies = set()
+
+
+def begin_body(doc):
+    global active_body, prior_bodies
+    active_body = None
+    prior_bodies = {interface(b,'IBody2').Name for b in interface(doc,'IPartDoc').GetBodies2(0,False) or []}
+
+
+def body_scope(doc):
+    if active_body is not None:
+        sd=interface(doc.SelectionManager,'ISelectionMgr').CreateSelectData()
+        sd.Mark=8
+        require(active_body.Select2(True,sd),'Cannot select feature body')
+    return active_body is not None
+
+
+def remember_body(doc):
+    global active_body
+    candidates=[interface(b,'IBody2') for b in interface(doc,'IPartDoc').GetBodies2(0,False) or []
+                if interface(b,'IBody2').Name not in prior_bodies]
+    require(len(candidates)==1,'Feature merged or split an unrelated body')
+    active_body=candidates[0]
+
+
+def write_report(filename, data):
+    VALIDATION.mkdir(parents=True,exist_ok=True)
+    (VALIDATION/filename).write_text(json.dumps(data,indent=2),encoding='utf-8')
 
 
 def require(value, message):
@@ -137,13 +168,15 @@ def loft(doc, sketches, name, cut=False):
     doc.ClearSelection2(True)
     for i,sk in enumerate(sketches):
         require(sk.Select2(i != 0,1), 'Loft profile selection failed')
+    merge=body_scope(doc)
     if cut:
-        f = doc.FeatureManager.InsertCutBlend(False,False,False,1.,0,0,False,0.,0.,0,True,True)
+        f = doc.FeatureManager.InsertCutBlend(False,False,False,1.,0,0,False,0.,0.,0,True,not merge)
     else:
         f = doc.FeatureManager.InsertProtrusionBlend2(False,False,False,1.,0,0,0.,0.,
-            False,False,False,0.,0.,0,True,True,True,0)
+            False,False,False,0.,0.,0,merge,True,not merge,0)
     require(f, name + ' loft failed')
     f.Name = name
+    remember_body(doc)
     doc.ClearSelection2(True)
     print('  Feature',name,flush=True)
     return f
@@ -152,19 +185,23 @@ def loft(doc, sketches, name, cut=False):
 def extrude(doc, sketch, depth, name, reverse=False):
     doc.ClearSelection2(True)
     require(sketch.Select2(False,0), 'Extrude profile selection failed')
+    merge=body_scope(doc)
     f=doc.FeatureManager.FeatureExtrusion3(True,False,reverse,0,0,depth/1000,0.,
-        False,False,False,False,0.,0.,False,False,False,False,True,True,True,0,0.,False)
+        False,False,False,False,0.,0.,False,False,False,False,merge,True,not merge,0,0.,False)
     require(f,name+' extrusion failed').Name=name
+    remember_body(doc)
     return f
 
 
 def cut_extrude(doc, sketch, depth, name, both=False):
     doc.ClearSelection2(True)
     require(sketch.Select2(False,0),'Cut profile selection failed')
+    scoped=body_scope(doc)
     f=doc.FeatureManager.FeatureCut4(not both,False,False,0,0,depth/1000,depth/1000,
         False,False,False,False,0.,0.,False,False,False,False,False,
-        True,True,False,False,False,0,0.,False,True)
+        True,not scoped,False,False,False,0,0.,False,True)
     require(f,name+' cut failed').Name=name
+    remember_body(doc)
     return f
 
 
@@ -185,35 +222,46 @@ def revolve(doc, name, profile):
     doc.ClearSelection2(True)
     sk.Select2(False,0)
     require(axis.Select4(True,sd),'Revolve axis selection failed')
+    merge=body_scope(doc)
     f=doc.FeatureManager.FeatureRevolve2(True,True,False,False,False,False,0,0,
-        2*math.pi,0.,False,False,0.,0.,0,0.,0.,True,True,True)
+        2*math.pi,0.,False,False,0.,0.,0,0.,0.,merge,True,not merge)
     require(f,name+' revolve failed').Name=name
+    remember_body(doc)
     return f
 
 
-def part_check(doc, names):
-    require(doc.EditRebuild3(),'Part rebuild failed')
-    bodies=interface(doc,'IPartDoc').GetBodies2(0,False)
-    require(bodies and len(bodies)==1,'Expected one solid body')
-    body=interface(bodies[0],'IBody2')
-    require(body.Check()==1,'Invalid solid')
-    approx_bounds=[v*1000 for v in body.GetBodyBox()]
-    bounds=[]
-    for direction in [(-1.,0.,0.),(0.,-1.,0.),(0.,0.,-1.),(1.,0.,0.),(0.,1.,0.),(0.,0.,1.)]:
-        ok,x,y,z=body.GetExtremePoint(*direction,0.,0.,0.)
-        require(ok,'Exact bound evaluation failed')
-        axis=next(i for i,v in enumerate(direction) if v)
-        bounds.append((x,y,z)[axis]*1000)
-    volume=body.GetMassProperties(1.)[3]*1e9
-    checked=[]
-    for name in names:
-        f=feature(doc,name)
-        require(f,'Missing native feature '+name)
-        err,warn=f.GetErrorCode2()
-        require(err==0,f'Feature {name} error {err}, warning {warn}')
-        checked.append({'name':name,'type':f.GetTypeName2(),'error':err,'warning':warn})
-    return {'bodies':1,'valid':True,'bounds_mm':bounds,'approx_bounds_mm':approx_bounds,
-            'volume_mm3':volume,'features':checked}
+def solid_geometry(doc):
+    """Solid counts, volumes and exact bounds in the document's coordinates."""
+    sources=[]
+    if doc.GetType()==1:
+        sources=[(doc,None)]
+    else:
+        for obj in interface(doc,'IAssemblyDoc').GetComponents(False) or []:
+            component=interface(obj,'IComponent2')
+            part=interface(component.GetModelDoc2(),'IModelDoc2')
+            require(part,'Unresolved component '+component.Name2)
+            if part.GetType()==1:
+                sources.append((part,component.GetTotalTransform(False)))
+    solids=[]
+    for part,transform in sources:
+        for obj in interface(part,'IPartDoc').GetBodies2(0,False) or []:
+            body=interface(obj,'IBody2')
+            require(body.Check()==1,'Invalid solid geometry')
+            if transform is not None:
+                body=interface(body.Copy(),'IBody2')
+                require(body.ApplyTransform(transform),'Cannot evaluate positioned solid')
+            bounds=[]
+            for direction in [(-1.,0.,0.),(0.,-1.,0.),(0.,0.,-1.),(1.,0.,0.),(0.,1.,0.),(0.,0.,1.)]:
+                ok,x,y,z=body.GetExtremePoint(*direction,0.,0.,0.)
+                require(ok,'Cannot evaluate solid bounds')
+                axis=next(i for i,v in enumerate(direction) if v)
+                bounds.append((x,y,z)[axis]*1000)
+            solids.append({'bounds_mm':bounds,'volume_mm3':body.GetMassProperties(1.)[3]*1e9})
+    require(solids,'No solid geometry')
+    return {'solid_count':len(solids),'volume_mm3':sum(s['volume_mm3'] for s in solids),
+            'bounds_mm':[min(s['bounds_mm'][i] for s in solids) for i in range(3)]+
+                        [max(s['bounds_mm'][i] for s in solids) for i in range(3,6)],
+            'solid_volumes_mm3':sorted(s['volume_mm3'] for s in solids)}
 
 
 def save_new(sw,doc,path,kind=1):
