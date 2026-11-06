@@ -4,7 +4,7 @@
 
 The models support appearance review and early factory quotations. We preserve the design's unresolved details so the factory can assess the intended appearance before mechanism selection drives further changes.
 
-The current reference set is `inputs/004/`. Its drawings and nominal dimension register govern the reconstruction. Dimensions belong in those references and model parameters; check results belong in the existing JSON reports under `output/validation/`.
+The current reference set is `inputs/004/`. Its drawings and nominal dimension register govern the reconstruction. Dimensions belong in those references and model parameters; check results belong in the existing JSON reports in the chosen output version's `validation/` folder.
 
 ## Why solids remain separate
 
