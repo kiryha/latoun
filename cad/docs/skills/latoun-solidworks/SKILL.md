@@ -7,7 +7,8 @@ description: Build or modify Latoun native SOLIDWORKS models on the licensed Win
 
 Work in the `cad/` directory containing `AGENTS.md`, `scripts/` and `inputs/`.
 Read its `AGENTS.md`, `docs/model_structure.md` and `docs/assumptions.md` first.
-Keep all changes inside `cad/`; the application manifest is read-only.
+Keep repository changes inside `cad/`; the application manifest is read-only.
+Generated deliverables go to the external output root specified in `AGENTS.md`.
 
 ## Choose the smallest appropriate operation
 
@@ -16,7 +17,11 @@ Keep all changes inside `cad/`; the application manifest is read-only.
 - **Export only:** use the saved current native files and their validation reports. Do not rebuild geometry just to change export format.
 - **Documentation only:** do not launch SOLIDWORKS.
 
-The user handles backups and versions. Scripts refuse to overwrite native designs.
+Use three-digit version folders under `H:/@transfer_vdi_pc/latoun/output/`.
+`001` is the previous backup, `002` the latest completed output, and `003` the
+next build destination. Preserve completed versions; do not add version suffixes
+to model filenames. Each version contains `solidworks/`, `step/`, `stl/` and
+`validation/`. Scripts refuse to overwrite native designs.
 Before a geometry rebuild, confirm the intended output names are available. If they
 are occupied and replacement has not been authorized, ask the user to back them up
 or explicitly authorize replacement. Do not generate extra version suffixes.
@@ -98,7 +103,20 @@ SOLIDWORKS installation is in `sw_helpers.INSTALL`. Do not install another CAD
 library or change corporate security settings to work around COM restrictions.
 Use the tool's approval mechanism for desktop COM access when needed.
 
-For a fresh output area:
+Before the next run, update the legacy path wiring: `sw_helpers.OUT` and
+`VALIDATION`, plus the STEP and STL targets in their export scripts, still point
+to unversioned `cad/output/` locations. Make all four resolve beneath the same
+selected version directory (`H:/@transfer_vdi_pc/latoun/output/003/` for the next
+build). Do not execute the commands below until this is done. This documentation
+update does not itself move files or change script destinations.
+
+When reusing an earlier version, copy required native parts into the new version
+and build or relink assemblies there. Validate references against that version's
+`solidworks/` folder; do not leave dependencies on `001`, `002` or legacy paths.
+Regenerate validation reports for the destination rather than treating copied
+reports with old paths as current evidence.
+
+For a fresh, correctly configured output version:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_parts.py
@@ -130,7 +148,7 @@ Resolve stale output through the user's backup/replacement decision.
 
 ## Evidence required before completion
 
-All JSON reports go in `output/validation/`, never beside the model files.
+All JSON reports go in the selected version's `validation/`, never beside the model files.
 
 1. Each asset part: expected 2/2/4/5 valid bodies, intended envelope, named features without
    rebuild errors, successful save and reopen.
@@ -145,7 +163,8 @@ All JSON reports go in `output/validation/`, never beside the model files.
 5. STL: compare mesh bounds and signed-volume magnitude with the native group.
    Check all four meshes with Houdini's installed `ginfo -s <file>` when available.
    Numeric units are millimeters; do not auto-center or scale the meshes.
-6. Verify that native references use current files rather than `.backup/` paths.
+6. Verify that native references use files in the selected version, not earlier
+   versions or legacy output paths.
    Keep the source backup unchanged. Check actual outputs, not only logs.
 
 The shipped export checks use numerical comparison thresholds, not production
