@@ -30,7 +30,7 @@ def check_stl(path,reference):
 
 
 def main():
-    target=ROOT/'output'/'stl'
+    target=OUTPUT/'stl'
     target.mkdir(parents=True,exist_ok=True)
     check_manifest()
     sw=connect()

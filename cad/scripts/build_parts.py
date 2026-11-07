@@ -1,178 +1,184 @@
 """Build native Latoun appearance parts. No existing design is overwritten."""
 import argparse
+import hashlib
 import faulthandler
 import json
 import math
 from sw_helpers import *
-from profiles import simplified_loop
+from profiles import input_loop, rdp
 import sw_helpers
 from model_layout import ASSETS, check_manifest
 
 
-def insert(doc,switch=False):
-    a=rr_sketch(doc,'Rear_38x74_R8',0,38,74,8)
-    b=rr_sketch(doc,'Face_34x70_R6',3,34,70,6)
-    loft(doc,[a,b],'Insert_Taper')
-    names=['Insert_Taper']
-    if switch:
-        a=rr_sketch(doc,'Slot_Rear_5x22',0,5,22,.5)
-        b=rr_sketch(doc,'Slot_Front_5x25',3,5,25,.5)
-        loft(doc,[a,b],'Actuator_Opening',True)
-        names+=['Actuator_Opening']
-    return names
-
-
-def plate(doc):
-    stations=[(0,69.5,119.5,3),(.25,70,120,3),(2.75,65.5,115.5,2.5),(3,65,115,2.5)]
-    sketches=[rr_sketch(doc,f'Outline_{i}',*st) for i,st in enumerate(stations)]
-    names=[]
-    for i in range(3):
-        name=['Rear_Edge_Break','Main_Edge_Taper','Front_Edge_Break'][i]
-        loft(doc,sketches[i:i+2],name)
-        names.append(name)
-    a=rr_sketch(doc,'Window_Rear',0,38.5,74.5,8.25)
-    b=rr_sketch(doc,'Window_Front',3,34.5,70.5,6.25)
-    loft(doc,[a,b],'Insert_Window_Reveal_025',True)
-    names+=['Insert_Window_Reveal_025']
-    # Two holes share one dimensioned sketch and a single native extruded cut.
-    sm=start_sketch(doc,'Fixings_D3_83_Pitch',3)
-    sk=finish_sketch(doc,'Fixings_D3_83_Pitch',[circle(sm,3,0,41.5),circle(sm,3,0,-41.5)])
-    cut_extrude(doc,sk,3,'Fixing_Holes_D3_83_Pitch')
-    return names+['Fixing_Holes_D3_83_Pitch']
-
-
-def ring(doc):
-    sm=start_sketch(doc,'Ring_66x116_Wall2',-2)
-    sk=finish_sketch(doc,'Ring_66x116_Wall2',rounded_rect(sm,66,116,1)+rounded_rect(sm,62,112,1))
-    extrude(doc,sk,2,'Ring_Thickness_2')
-    return ['Ring_Thickness_2']
-
-
-def bezel(doc):
-    a=rr_sketch(doc,'Bezel_Rear_22x50_R7',3,22,50,7)
-    b=rr_sketch(doc,'Bezel_Front_16x44_R4',7,16,44,4)
-    loft(doc,[a,b],'Bezel_Taper')
-    a=rr_sketch(doc,'Slot_Joint_5x25',3,5,25,.5)
-    b=rr_sketch(doc,'Slot_Front_5x29',7,5,29,.5)
-    loft(doc,[a,b],'Bezel_Actuator_Opening',True)
-    return ['Bezel_Taper','Bezel_Actuator_Opening']
-
-
-def base(doc):
-    revolve(doc,'Turned_Base_D24_D17',[(3,0),(3,12),(7,8.5),(7,0)])
-    return ['Turned_Base_D24_D17']
-
-
-def collar(doc):
-    revolve(doc,'Turned_Collar_D14',[(6,0),(6,7),(11,7),(11,0)])
-    return ['Turned_Collar_D14']
-
-
-def cap(doc):
-    revolve(doc,'Turned_Cap_D15_D14',[(28,0),(28,7.5),(29,7),(29,0)])
-    p=simplified_loop('raised_L/Z29.001')
-    lo=[min(v[i] for v in p) for i in (0,1)]
-    hi=[max(v[i] for v in p) for i in (0,1)]
-    p=[tuple((v[i]-(lo[i]+hi[i])/2)*7/(hi[i]-lo[i]) for i in (0,1)) for v in p]
-    sm=start_sketch(doc,'Raised_L_7x7_Outline',29)
-    # This decorative traced outline is fixed as a group, while its boss height
-    # remains a native driving parameter. Fine source bevels are omitted.
-    ents=polygon(sm,p)
+def soften_caps(doc,name,radius):
     doc.ClearSelection2(True)
-    for i,e in enumerate(ents): e.Select4(i!=0,None)
-    doc.SketchAddConstraints('sgFIXED')
-    sk=finish_sketch(doc,'Raised_L_7x7_Outline',ents,False)
-    extrude(doc,sk,.3,'Raised_L_030')
-    return ['Turned_Cap_D15_D14','Raised_L_030']
+    count=0
+    for obj in sw_helpers.active_body.GetEdges():
+        edge=interface(obj,'IEdge')
+        values=edge.GetCurveParams2()
+        if values and abs(values[2]-values[5])<1e-9:
+            require(interface(edge,'IEntity').Select4(count>0,None),'Fillet edge selection failed')
+            count+=1
+    require(count,'No cap edges selected')
+    f=doc.FeatureManager.FeatureFillet3(3,radius/1000,0.,0.,0,0,0,None,None,None,None,None,None,None)
+    require(f,'Cap edge treatment failed: '+name).Name=name
+    remember_body(doc)
+    return name
 
 
-def stem(doc):
-    sk=rr_sketch(doc,'Stem_4x10_R05',-2,4,10,.5)
-    extrude(doc,sk,23,'Stem_Length_23')
-    sm=start_sketch(doc,'Reference_Pivot_D1',0,'Right Plane')
-    sk=finish_sketch(doc,'Reference_Pivot_D1',[circle(sm,1)])
-    cut_extrude(doc,sk,3,'Reference_Pivot_Bore',True)
-    return ['Stem_Length_23','Reference_Pivot_Bore']
-
-
-def grip(doc):
-    sk=rr_sketch(doc,'Grip_10x10_R16',20,10,10,1.6)
-    extrude(doc,sk,20,'Grip_Blank_Length20')
-    sm=start_sketch(doc,'Curved_Ends_R10',0,'Right Plane')
-    ents=polygon(sm,[(-45,-15),(-15,-15),(-15,15),(-45,15)])+[circle(sm,20,-30,0)]
-    sk=finish_sketch(doc,'Curved_Ends_R10',ents)
-    cut_extrude(doc,sk,6,'Sculpted_Cylindrical_End_Cuts',True)
-    return ['Grip_Blank_Length20','Sculpted_Cylindrical_End_Cuts']
-
-
-def flute_profile(doc,name,z,mean_radius=7.75):
+def source_outline(doc,name,z,w,h,r,sx=1.,sy=1.):
+    # Houdini point bevels are quadratic Beziers, not circular corner radii.
     sm=start_sketch(doc,name,z)
-    phase=math.radians(2.25*(z-8))
     entities=[]
-    # Forty smooth B-spline segments sample the supplied cosine equation at 13
-    # points per period. This produces native curved faces, not mesh triangles.
-    for k in range(40):
+    for x,y,angle in [(w/2-r,h/2-r,0),(-w/2+r,h/2-r,90),(-w/2+r,-h/2+r,180),(w/2-r,-h/2+r,270)]:
         points=[]
-        for j in range(13):
-            t=(k+j/12)*2*math.pi/40
-            radius=mean_radius+.25*math.cos(40*t)
-            points.extend([radius*math.cos(t+phase)/1000,radius*math.sin(t+phase)/1000,0.])
-        arr=com.VARIANT(pythoncom.VT_ARRAY|pythoncom.VT_R8,points)
-        entities.append(require(sm.CreateSpline2(arr,False),'Cosine spline failed'))
+        c,t=math.cos(math.radians(angle)),math.sin(math.radians(angle))
+        for j in range(9):
+            u=j/8
+            px,py=r*(1-u*u),r*(2*u-u*u)
+            points.extend([(x+c*px-t*py)*sx/1000,(y+t*px+c*py)*sy/1000,0.])
+        entities.append(require(sm.CreateSpline2(com.VARIANT(pythoncom.VT_ARRAY|pythoncom.VT_R8,points),False),'Corner spline failed'))
+    for a,b in [((w/2,-h/2+r),(w/2,h/2-r)),((w/2-r,h/2),(-w/2+r,h/2)),((-w/2,h/2-r),(-w/2,-h/2+r)),((-w/2+r,-h/2),(w/2-r,-h/2))]:
+        entities.append(line(sm,(a[0]*sx,a[1]*sy),(b[0]*sx,b[1]*sy)))
     doc.ClearSelection2(True)
-    for i,e in enumerate(entities):e.Select4(i!=0,None)
+    for i,e in enumerate(entities): e.Select4(i!=0,None)
     doc.SketchAddConstraints('sgFIXED')
     return finish_sketch(doc,name,entities,False)
 
 
-def fluted_body(doc):
-    profile=flute_profile(doc,'Cosine_40_Flute_Profile',8.2)
-    # A straight 3D path plus a prescribed twist creates a true native sweep.
+def slot(doc,name):
+    a=source_outline(doc,name+'_Rear',-.81,4.1,18.5,.4)
+    b=source_outline(doc,name+'_Front',7.6,4.1,27.5,.4)
+    loft(doc,[a,b],name,True)
+    return name
+
+
+def insert(doc,switch=False):
+    a=source_outline(doc,'Insert_Rear_38x71',0,38,71,7.1)
+    b=source_outline(doc,'Insert_Front_34x67',3,34,67,5.1)
+    loft(doc,[a,b],'Insert_Taper')
+    names=['Insert_Taper',soften_caps(doc,'Insert_Edge_Break',.15)]
+    if switch: names.append(slot(doc,'Actuator_Opening'))
+    return names
+
+
+def plate(doc):
+    a=source_outline(doc,'Plate_Rear_70x120',0,70,120,1)
+    b=source_outline(doc,'Plate_Front_Scaled',3,70,120,1,.93,.962)
+    loft(doc,[a,b],'Plate_Taper')
+    a=source_outline(doc,'Window_Rear',0,38,71,7.1)
+    b=source_outline(doc,'Window_Front',3,34,67,5.1)
+    loft(doc,[a,b],'Insert_Window_Zero_Clearance',True)
+    sm=start_sketch(doc,'Fixings_D3_83_Pitch',3)
+    sk=finish_sketch(doc,'Fixings_D3_83_Pitch',[circle(sm,3,0,41.5),circle(sm,3,0,-41.5)])
+    cut_extrude(doc,sk,3,'Fixing_Holes_D3_83_Pitch')
+    return ['Plate_Taper','Insert_Window_Zero_Clearance','Fixing_Holes_D3_83_Pitch',soften_caps(doc,'Plate_Edge_Break',.15)]
+
+
+def ring(doc):
+    sm=start_sketch(doc,'Backing_Annulus',-2)
+    sk=finish_sketch(doc,'Backing_Annulus',rounded_rect(sm,66,116,.159)+rounded_rect(sm,62.18,112.18,.159))
+    extrude(doc,sk,2,'Backing_Thickness_2')
+    return ['Backing_Thickness_2',soften_caps(doc,'Backing_Edge_Break',.159)]
+
+
+def bezel(doc):
+    a=source_outline(doc,'Collar_Rear',3,22.1,50.1,6.05)
+    b=source_outline(doc,'Collar_Front',7,16,44,3)
+    loft(doc,[a,b],'Collar_Taper')
+    return ['Collar_Taper',soften_caps(doc,'Collar_Edge_Break',.1),slot(doc,'Collar_Opening')]
+
+
+def base(doc):
+    z=2.98164281845
+    revolve(doc,'Turned_Base',[(z,0),(z,12),(z+4,8.6),(z+4,0)])
+    return ['Turned_Base',soften_caps(doc,'Base_Edge_Break',.3)]
+
+
+def collar(doc):
+    z=6.12025104523
+    revolve(doc,'Turned_Neck',[(z,0),(z,7),(z+5,7),(z+5,0)])
+    return ['Turned_Neck']
+
+
+def cap(doc):
+    z=28.0012683868
+    revolve(doc,'Turned_Cap',[(z-.4,0),(z-.4,7.5),(z+.4,7),(z+.4,0)])
+    cap_edge=soften_caps(doc,'Cap_Edge_Break',.12)
+    points=[(x*10+.364937484264,y*10) for x,y in input_loop('logo')]
+    opposite=max(range(1,len(points)),key=lambda i:math.dist(points[0],points[i]))
+    points=rdp(points[:opposite+1],.01)[:-1]+rdp(points[opposite:]+points[:1],.01)[:-1]
+    sm=start_sketch(doc,'Logo_Outline',z+.373907905817)
+    ents=polygon(sm,points)
     doc.ClearSelection2(True)
-    doc.Insert3DSketch2(True)
-    path_line=doc.SketchManager.CreateLine(0.,0.,.0082,0.,0.,.0278)
-    doc.ClearSelection2(True)
-    path_line.Select4(False,None)
+    for i,e in enumerate(ents):e.Select4(i!=0,None)
     doc.SketchAddConstraints('sgFIXED')
-    doc.Insert3DSketch2(True)
-    path=interface(doc.FeatureByPositionReverse(0),'IFeature')
-    path.Name='Helix_Axis_Length19_6'
+    sk=finish_sketch(doc,'Logo_Outline',ents,False)
+    extrude(doc,sk,.3,'Raised_Logo')
+    return ['Turned_Cap',cap_edge,'Raised_Logo']
+
+
+def stem(doc):
+    sk=rr_sketch(doc,'Stem_4x10',0,4,10,.5)
+    extrude(doc,sk,23.4,'Stem_Length23_4')
+    sm=start_sketch(doc,'Pivot_D1',0,'Right Plane')
+    sk=finish_sketch(doc,'Pivot_D1',[circle(sm,1,-2,0)])
+    cut_extrude(doc,sk,3,'Pivot_Bore',True)
+    return ['Stem_Length23_4','Pivot_Bore']
+
+
+def grip(doc):
+    sk=rr_sketch(doc,'Grip_10x10',21.9161,10,10,1.6)
+    extrude(doc,sk,20,'Grip_Blank')
+    sm=start_sketch(doc,'Curved_Ends_R10',0,'Right Plane')
+    ents=polygon(sm,[(-45,-15),(-15,-15),(-15,15),(-45,15)])+[circle(sm,20,-31.9161,0)]
+    sk=finish_sketch(doc,'Curved_Ends_R10',ents)
+    cut_extrude(doc,sk,6,'Sculpted_Ends',True)
+    return ['Grip_Blank','Sculpted_Ends']
+
+
+def fluted_body(doc):
+    z=7.60046416521
+    sm=start_sketch(doc,'Source_Flute_Section',z)
+    points=input_loop('dimmer_flute_section')
+    # Each period has two five-point bevel curves and two straight flanks.
+    entities=[]
+    require(len(points)==400,'Unexpected source flute section')
+    for i in range(0,400,5):
+        run=points[i:i+5]
+        values=[v for x,y in run for v in (x/1000,y/1000,0.)]
+        entities.append(require(sm.CreateSpline2(com.VARIANT(pythoncom.VT_ARRAY|pythoncom.VT_R8,values),False),'Flute curve failed'))
+        entities.append(line(sm,run[-1],points[(i+5)%400]))
     doc.ClearSelection2(True)
-    profile.Select2(False,1)
-    path.Select2(True,4)
-    sweep=doc.FeatureManager.InsertProtrusionSwept4(False,False,8,True,False,
-        0,0,False,0.,0.,0,0,False,True,True,math.radians(44.1),True,False,0.,0)
-    require(sweep,'Twisted cosine sweep failed').Name='Helical_Grip_Lead160'
+    for i,e in enumerate(entities):e.Select4(i!=0,None)
+    doc.SketchAddConstraints('sgFIXED')
+    profile=finish_sketch(doc,'Source_Flute_Section',entities,False)
+    doc.ClearSelection2(True);doc.Insert3DSketch2(True)
+    seg=doc.SketchManager.CreateLine(0.,0.,z/1000,0.,0.,(z+20)/1000)
+    seg.Select4(False,None);doc.SketchAddConstraints('sgFIXED');doc.Insert3DSketch2(True)
+    path=interface(doc.FeatureByPositionReverse(0),'IFeature');path.Name='Grip_Axis20'
+    doc.ClearSelection2(True);profile.Select2(False,1);path.Select2(True,4)
+    f=doc.FeatureManager.InsertProtrusionSwept4(False,False,8,True,False,0,0,False,0.,0.,0,0,False,True,True,math.radians(46),True,False,0.,0)
+    require(f,'Source flute sweep failed').Name='Grip_Twist46'
     remember_body(doc)
-    # Thin end lofts reduce the whole radial profile by .2, as in sheet 08.
-    lower=flute_profile(doc,'Lower_End_Reduced02',8,7.55)
-    loft(doc,[lower,profile],'Lower_End_Break_02')
-    upper=flute_profile(doc,'Upper_Working_Profile',27.8)
-    end=flute_profile(doc,'Upper_End_Reduced02',28,7.55)
-    loft(doc,[upper,end],'Upper_End_Break_02')
-    return ['Helical_Grip_Lead160','Lower_End_Break_02','Upper_End_Break_02']
+    return ['Grip_Twist46']
 
 
 def head(doc):
+    z=3.28183
+    h=4*math.sqrt(3)
     sketches=[]
-    for i,(z,w,h) in enumerate([(3,7.8,6.8),(3.1,8,7),(5.5,8,7),(6,7,6)]):
-        name=f'Hex_Station_{i}'
-        sm=start_sketch(doc,name,z)
-        points=[(w/2,0),(w/4,h/2),(-w/4,h/2),(-w/2,0),(-w/4,-h/2),(w/4,-h/2)]
-        sketches.append(finish_sketch(doc,name,polygon(sm,points)))
-    names=[]
-    for i in range(3):
-        name=['Head_Lower_Break','Head_Blank','Head_Upper_Bevel'][i]
-        loft(doc,sketches[i:i+2],name)
-        names.append(name)
-    cross=[(-.5,-2),(.5,-2),(.5,-.5),(2,-.5),(2,.5),(.5,.5),(.5,2),(-.5,2),(-.5,.5),(-2,.5),(-2,-.5),(-.5,-.5)]
-    sketches=[]
-    for z in (5,6):
-        name=f'Cross_Recess_Z{z}'
-        sm=start_sketch(doc,name,z)
-        sketches.append(finish_sketch(doc,name,polygon(sm,cross)))
-    loft(doc,sketches,'Decorative_Cross_Recess_1_Deep',True)
-    return names+['Decorative_Cross_Recess_1_Deep']
+    for i,(height,w) in enumerate([(0,8),(3-.643,8),(3,8-2*.643/math.cos(math.pi/6))]):
+        sm=start_sketch(doc,f'Head_Section{i}',z+height)
+        hh=w*math.sqrt(3)/2
+        sketches.append(finish_sketch(doc,f'Head_Section{i}',polygon(sm,[(w/2,0),(w/4,hh/2),(-w/4,hh/2),(-w/2,0),(-w/4,-hh/2),(w/4,-hh/2)])))
+    loft(doc,sketches[:2],'Head_Blank');loft(doc,sketches[1:],'Head_Top_Bevel')
+    sm=start_sketch(doc,'Cross_Recess',z+3)
+    a=.4;b=2
+    p=[(-a,-b),(a,-b),(a,-a),(b,-a),(b,a),(a,a),(a,b),(-a,b),(-a,a),(-b,a),(-b,-a),(-a,-a)]
+    sk=finish_sketch(doc,'Cross_Recess',polygon(sm,p))
+    cut_extrude(doc,sk,3-2.11838495731,'Cross_Recess_Depth')
+    return ['Head_Blank','Head_Top_Bevel','Cross_Recess_Depth']
 
 
 JOBS={'1gang_plate_metal':plate,'1gang_plate_silicone':ring,'plate_fixing_head':head,
@@ -229,6 +235,7 @@ def main():
     parser.add_argument('--only',nargs='+',choices=list(ASSETS))
     opt=parser.parse_args()
     check_manifest()
+    source_hash=hashlib.sha256((INPUT/'design.json').read_bytes()).hexdigest()
     report_path=VALIDATION/'parts_validation.json'
     records=json.loads(report_path.read_text()) if report_path.exists() else {}
     sw=connect()
@@ -240,6 +247,7 @@ def main():
             path=OUT/(name+'.SLDPRT')
             if path.exists():
                 require(name in records,'Existing untracked part '+name)
+                require(records[name].get('input_sha256',source_hash)==source_hash,'Input changed; existing output must not be reused as current')
                 current=reopen(sw,path)
                 names=[f['name'] for f in records[name]['features']]
             else:
@@ -253,9 +261,7 @@ def main():
                     body=sw_helpers.active_body
                     body.Name=component
                     if component in ('switch_stem','switch_grip'):
-                        names.append(move_body(current,body,component+'_Angle25',angle=25))
-                        body=next(interface(b,'IBody2') for b in interface(current,'IPartDoc').GetBodies2(0,False) if interface(b,'IBody2').Name==component)
-                        names.append(move_body(current,body,component+'_Position',z=-10))
+                        names.append(move_body(current,body,component+'_Position',z=-12))
                     if component=='plate_fixing_head':
                         names.append(move_body(current,body,'Lower_Fixing_Position',y=-41.5))
                         body=interface(interface(current,'IPartDoc').GetBodies2(0,False)[0],'IBody2')
@@ -277,7 +283,7 @@ def main():
                 require(max(abs(a-b) for a,b in zip(old['bounds_mm'],result['bounds_mm']))<.002,'Consolidation changed bounds')
                 require(len(old['solid_volumes_mm3'])==result['solid_count'],'Consolidation changed body count')
                 require(all(abs(a-b)/a<1e-5 for a,b in zip(old['solid_volumes_mm3'],result['solid_volumes_mm3'])),'Consolidation changed body volumes')
-            result.update(path=str(path),reopened=True,asset_id=ASSETS[name])
+            result.update(path=str(path),reopened=True,asset_id=ASSETS[name],input_sha256=source_hash)
             records[name]=result
             write_report('parts_validation.json',records)
             sw.CloseDoc(current.GetTitle())

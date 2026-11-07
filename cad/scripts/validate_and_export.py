@@ -28,7 +28,7 @@ def validate_parts(sw):
 def exports(sw,only=None):
     require(not sw_helpers.initial_documents,'Export requires a session without pre-existing documents')
     check_manifest()
-    target=ROOT/'output'/'step'
+    target=OUTPUT/'step'
     target.mkdir(parents=True,exist_ok=True)
     names=list(ASSETS)+list(ASSEMBLIES)
     if only:

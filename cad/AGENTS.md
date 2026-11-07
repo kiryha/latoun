@@ -4,12 +4,12 @@
 - Never create Git commits or push. The user manages Git and versioning manually.
 - Preserve all input, backup and existing design files. Do not overwrite designs without confirmation; use the fresh output area provided by the user. Use the agreed three-digit output version folder; do not invent filename suffixes or ZIP packages.
 - Before CAD construction, read `docs/model_structure.md`, `docs/assumptions.md` and `docs/skills/latoun-solidworks/SKILL.md`.
-- Current geometry comes from `inputs/004/`. Preserve its remaining overlaps and unfinished mechanism interfaces. Do not invent dimensions, fits, materials or tolerances.
+- The active update uses `inputs/005/`, limited to the existing one-gang switch and dimmer. Preserve its remaining overlaps and unfinished mechanism interfaces. Do not invent dimensions, fits, materials or tolerances.
 - Match the asset manifest with four multibody SLDPRT files and two product SLDASM files. Keep physical components as separate named bodies with native features. Use a native body copy for the second fixing head; do not create extra external component files.
 - Use lowercase Latoun names without revision suffixes. The four current asset groups are `1gang_plate`, `1gang_plate_screws`, `1gang_slot1_switch` and `1gang_slot1_dimmer`.
-- The output root is `H:/@transfer_vdi_pc/latoun/output/`. Version `001` holds the former backup, `002` is the latest completed output, and `003` is the next build destination. Preserve completed versions.
+- The output root is `D:/projects/latoun/cad/output/`. The current version is `003`, built from `inputs/005/`; `001` and `002` are earlier outputs. Preserve completed versions.
 - Each version contains `solidworks/`, `step/`, `stl/` and `validation/`; keep all generated JSON reports in that version's `validation/`. Native assembly references must resolve within the same version. Keep filenames unchanged across versions.
-- Repository edits stay in `cad/`; the user-designated external output directory is for generated CAD deliverables. Before the next build, adapt the scripts' legacy unversioned output paths to the agreed destination; do not run them against the old location.
+- Repository edits stay in `cad/`; the selected version under `cad/output/` is for generated CAD deliverables. All four output folders derive from `scripts/sw_helpers.py:OUTPUT`; set the agreed version there before construction.
 - Save completed native work, close documents opened by automation after use, and exit SOLIDWORKS when possible. Preserve unrelated pre-existing user work. Report any unsaved recovery document or session left open.
 - Do not claim success until actual files have been saved, reopened and validated. STEP checks must include imported solids; a successful save can still produce an empty file.
 

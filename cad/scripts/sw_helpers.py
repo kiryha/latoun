@@ -7,8 +7,10 @@ import win32com.client as com
 from win32com.client import makepy
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'output' / 'solidworks'
-VALIDATION = ROOT / 'output' / 'validation'
+INPUT = ROOT / 'inputs' / '005'
+OUTPUT = ROOT / 'output' / '003'
+OUT = OUTPUT / 'solidworks'
+VALIDATION = OUTPUT / 'validation'
 INSTALL = Path(r'D:\programs\SOLIDWORKS\SOLIDWORKS')
 bindings = None
 initial_documents = set()

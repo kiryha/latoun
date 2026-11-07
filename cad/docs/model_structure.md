@@ -22,7 +22,7 @@ Grouping is for product organization, not a manufacturing decision. Bodies remai
 
 ## Files to use
 
-Output lives in `H:/@transfer_vdi_pc/latoun/output/<version>/`. The latest completed version is `002`; the next build is `003`. `001` holds the previous backup. Each version contains `solidworks/`, `step/`, `stl/` and `validation/`.
+Output lives in `D:/projects/latoun/cad/output/<version>/`. The current version is `003`, built from `inputs/005/`. Earlier versions remain unchanged. Each version contains `solidworks/`, `step/`, `stl/` and `validation/`.
 
 Open `solidworks/1gang_switch.SLDASM` or `solidworks/1gang_dimmer.SLDASM` inside the chosen version to review a complete product. Keep assembly references within that version so older versions remain independent.
 

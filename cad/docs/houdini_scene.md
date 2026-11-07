@@ -24,9 +24,10 @@ Verified on 2026-11-06:
 - Electrical mechanisms are unselected. Materials, finishes and manufacturing
   tolerances remain unconfirmed.
 
-The CAD repository's existing 004 construction assumptions belong to that older
-CAD revision. They do not override the supplied 010 scene, and a new reference
-package does not automatically migrate or validate the existing CAD models.
+Earlier CAD construction assumptions do not override the supplied 010 scene.
+The current one-gang CAD reconstruction uses input 005; see
+[design assumptions](assumptions.md) for its documented differences. A new
+reference package does not automatically migrate or validate CAD models.
 
 ## Locations on the author's PC
 

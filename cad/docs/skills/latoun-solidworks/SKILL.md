@@ -8,7 +8,7 @@ description: Build or modify Latoun native SOLIDWORKS models on the licensed Win
 Work in the `cad/` directory containing `AGENTS.md`, `scripts/` and `inputs/`.
 Read its `AGENTS.md`, `docs/model_structure.md` and `docs/assumptions.md` first.
 Keep repository changes inside `cad/`; the application manifest is read-only.
-Generated deliverables go to the external output root specified in `AGENTS.md`.
+Generated deliverables go to the versioned output root specified in `AGENTS.md`.
 
 ## Choose the smallest appropriate operation
 
@@ -17,9 +17,8 @@ Generated deliverables go to the external output root specified in `AGENTS.md`.
 - **Export only:** use the saved current native files and their validation reports. Do not rebuild geometry just to change export format.
 - **Documentation only:** do not launch SOLIDWORKS.
 
-Use three-digit version folders under `H:/@transfer_vdi_pc/latoun/output/`.
-`001` is the previous backup, `002` the latest completed output, and `003` the
-next build destination. Preserve completed versions; do not add version suffixes
+Use three-digit version folders under `D:/projects/latoun/cad/output/`.
+`003` is the current output from input `005`; `001` and `002` are earlier outputs. Preserve completed versions; do not add version suffixes
 to model filenames. Each version contains `solidworks/`, `step/`, `stl/` and
 `validation/`. Scripts refuse to overwrite native designs.
 Before a geometry rebuild, confirm the intended output names are available. If they
@@ -28,9 +27,11 @@ or explicitly authorize replacement. Do not generate extra version suffixes.
 
 ## Read inputs and decide what they mean
 
-The current source is `inputs/004/`: a nominal dimension register, drawing sheets
-and a ZIP containing analytic DXFs and decorative profiles. The dimensions in
-the register describe design intent; drawing pixels are not a precision source.
+The current source is `inputs/005/`: `design.json`, drawings and profile JSONs.
+Only the existing one-gang switch/dimmer assets are in scope. Source construction
+parameters govern; measured mesh bounds are comparison data. In particular, the
+insert is 34 x 67 at the front, the switch pose is neutral, and the dimmer section
+is sampled source geometry with 46-degree twist, not the previous cosine curve.
 
 For future handoffs, read `design.json` first, then the relevant drawings and
 profiles. The producer contract is [input_handoff_prompt.md](../../input_handoff_prompt.md).
@@ -53,7 +54,8 @@ analytic curves where supported, or a documented smooth approximation.
 | File | Responsibility |
 |---|---|
 | `scripts/build_parts.py` | Native multibody asset parts. `plate`, `ring`, `insert`, `bezel`, `stem`, `grip`, `base`, `collar`, `fluted_body`, `cap`, `head` construct their features. `JOBS` maps body builders; `BODY_JOBS` groups them into four files. |
-| `scripts/profiles.py` | Reads decorative line profiles from the current input ZIP. Change this reader only when the source format changes. |
+| `scripts/check_source.py` | Compares per-body bounds and sampled native surfaces with input OBJ references; review discrepancies rather than treating sampling as proof of exact equivalence. |
+| `scripts/profiles.py` | Reads the current sampled JSON profiles and simplifies decorative outlines. Change this reader only when the source format changes. |
 | `scripts/model_layout.py` | Manifest asset IDs, product membership and assembly placement. |
 | `scripts/sw_helpers.py` | Verified COM binding, native feature helpers, save/reopen, geometry checks and session cleanup. |
 | `scripts/build_assembly.py` | Builds the hierarchy and validates mates, paths and global leaf-component positions. |
@@ -62,14 +64,14 @@ analytic curves where supported, or a documented smooth approximation.
 
 Use `rg` to locate the relevant function before reading the whole builder.
 Dimensions are currently explicit numbers in construction functions, not a central
-parameter database. Update related section profiles consistently. Update expected
+parameter database. Changing INPUT alone does not update those numbers: map and
+review each changed recipe before building. Keep the input hash in part reports. Update related section profiles consistently. Update expected
 dimensions in validation from the **input reference**, not merely to agree with
 whatever geometry the implementation happens to produce.
 
 Use revolved profiles for turned shapes, sketches and extrusions for prismatic
 parts, and lofts only where sections change. Retain descriptive feature names and
-native dimensions. Existing dimmer-insert sketches are partly underdefined;
-decorative curves use fixed coordinates. Do not promise every feature is fully
+native dimensions. Source spline profiles use fixed coordinates; other sketches use native dimensions. Do not promise every feature is fully
 constrained or driven by a single parameter.
 
 ## Product hierarchy and coordinates
@@ -103,12 +105,10 @@ SOLIDWORKS installation is in `sw_helpers.INSTALL`. Do not install another CAD
 library or change corporate security settings to work around COM restrictions.
 Use the tool's approval mechanism for desktop COM access when needed.
 
-Before the next run, update the legacy path wiring: `sw_helpers.OUT` and
-`VALIDATION`, plus the STEP and STL targets in their export scripts, still point
-to unversioned `cad/output/` locations. Make all four resolve beneath the same
-selected version directory (`H:/@transfer_vdi_pc/latoun/output/003/` for the next
-build). Do not execute the commands below until this is done. This documentation
-update does not itself move files or change script destinations.
+Input profiles derive from `sw_helpers.INPUT`, currently `cad/inputs/005`.
+All output paths derive from `sw_helpers.OUTPUT`, currently `cad/output/003`.
+Change this single destination for a new user-requested version. `OUT`,
+`VALIDATION`, STEP and STL targets must remain beneath it.
 
 When reusing an earlier version, copy required native parts into the new version
 and build or relink assemblies there. Validate references against that version's
@@ -120,6 +120,7 @@ For a fresh, correctly configured output version:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_parts.py
+.\.venv\Scripts\python.exe scripts\check_source.py
 .\.venv\Scripts\python.exe scripts\build_assembly.py
 .\.venv\Scripts\python.exe scripts\validate_and_export.py
 .\.venv\Scripts\python.exe scripts\export_houdini.py
