@@ -10,6 +10,7 @@
 - The output root is `D:/projects/latoun/cad/output/`. The current version is `003`, built from `inputs/005/`; `001` and `002` are earlier outputs. Preserve completed versions.
 - Each version contains `solidworks/`, `step/`, `stl/` and `validation/`; keep all generated JSON reports in that version's `validation/`. Native assembly references must resolve within the same version. Keep filenames unchanged across versions.
 - Repository edits stay in `cad/`; the selected version under `cad/output/` is for generated CAD deliverables. All four output folders derive from `scripts/sw_helpers.py:OUTPUT`; set the agreed version there before construction.
+- `output/004/` is the approved SLA print derivative of `003`: three single-solid items, no added fit clearance, heads lowered 0.30 mm for attachment. Its grouping intentionally differs from manifest assets. Use `scripts/prepare_print.py`; do not redirect the main modeling pipeline to overwrite this print set.
 - Save completed native work, close documents opened by automation after use, and exit SOLIDWORKS when possible. Preserve unrelated pre-existing user work. Report any unsaved recovery document or session left open.
 - Do not claim success until actual files have been saved, reopened and validated. STEP checks must include imported solids; a successful save can still produce an empty file.
 
