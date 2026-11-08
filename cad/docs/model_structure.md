@@ -22,13 +22,14 @@ Grouping is for product organization, not a manufacturing decision. Bodies remai
 
 ## SLA fit-test files
 
-`output/004/` is a print preparation derived from the saved `003` models, not a replacement for the engineering assembly. It contains three single-solid items, each as SLDPRT, STEP and STL:
+`output/004/` is a print preparation derived from the saved `003` models, not a replacement for the engineering assembly. It contains four single-solid items, each as SLDPRT, STEP and STL:
 
 - `1gang_print_plate`: metal plate with both decorative heads joined; silicone excluded.
 - `1gang_print_inner`: switch insert and raised collar joined.
 - `1gang_print_actuator`: stem and grip joined.
+- `1gang_print_dimmer`: dimmer insert, base, neck, fluted grip and cap joined.
 
-The heads are lowered 0.30 mm to overlap the plate. No fit clearance or resin shrink compensation is added, as requested. These files are for an SLA fit test; actual fit depends on the printing and curing process. STL coordinates are in millimeters, with the original assembly positions retained. The print provider can choose orientation and supports.
+The heads are lowered 0.30 mm to overlap the plate. The dimmer cap is lowered 0.002 mm to close its tiny source gap and join the grip. No fit clearance or resin shrink compensation is added, as requested. These files are for an SLA fit test; actual fit depends on the printing and curing process. STL coordinates are in millimeters, with the original assembly positions retained. The print provider can choose orientation and supports.
 
 The native print files contain copied analytic source solids and Combine features. Their original sketch histories remain in `003`; the print files are self-contained and do not link back to it.
 

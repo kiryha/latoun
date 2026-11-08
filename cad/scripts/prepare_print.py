@@ -1,4 +1,5 @@
-"""Create the three approved SLA test items from saved version-003 solids."""
+"""Create approved SLA test items from saved version-003 solids."""
+import argparse
 import hashlib
 import json
 import struct
@@ -14,6 +15,7 @@ JOBS={
     '1gang_print_plate': [('1gang_plate','1gang_plate_metal'),('1gang_plate_screws','lower_fixing_head'),('1gang_plate_screws','upper_fixing_head')],
     '1gang_print_inner': [('1gang_slot1_switch','switch_insert'),('1gang_slot1_switch','switch_bezel')],
     '1gang_print_actuator': [('1gang_slot1_switch','switch_stem'),('1gang_slot1_switch','switch_grip')],
+    '1gang_print_dimmer': [('1gang_slot1_dimmer',n) for n in ('dimmer_insert','dimmer_base','dimmer_collar','dimmer_grip','dimmer_cap')],
 }
 
 
@@ -53,6 +55,9 @@ def mesh_topology(path):
 
 
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--only',nargs='+',choices=list(JOBS))
+    args=parser.parse_args()
     baseline=hashes()
     report_path=TARGET/'validation/print_validation.json'
     report=json.loads(report_path.read_text()) if report_path.exists() else {'units':'mm','clearance_added_mm':0,'heads_translation_z_mm':-.30,'items':{}}
@@ -67,6 +72,7 @@ def main():
             previous.append((setter,key,getter(key)));setter(key,value)
             require(abs(getter(key)-value)<1e-10,'Cannot set export preference')
         for name,sources in JOBS.items():
+            if args.only and name not in args.only:continue
             native=TARGET/'solidworks'/(name+'.SLDPRT')
             if not native.exists():
                 copies=[]
@@ -86,6 +92,9 @@ def main():
                     current.Name=body_name
                     if 'fixing_head' in body_name:
                         move_body(doc,current,'Seat_'+body_name,z=-.30)
+                    if body_name=='dimmer_cap':
+                        # Close the source's 0.000804 mm axial gap for one printable solid.
+                        move_body(doc,current,'Seat_Dimmer_Cap',z=-.002)
                 doc.ClearSelection2(True)
                 sd=interface(doc.SelectionManager,'ISelectionMgr').CreateSelectData();sd.Mark=2
                 for i,b in enumerate(interface(doc,'IPartDoc').GetBodies2(0,False)):
@@ -116,6 +125,7 @@ def main():
             finally:
                 sw.CloseAllDocuments(True)
             report['items'][name]={'native':str(native),'source_bodies':sources,'reopened':True,'geometry':geometry,'stl':mesh,'step_reimported_solids':1}
+            if name=='1gang_print_dimmer':report['items'][name]['cap_translation_z_mm']=-.002
             report_path.parent.mkdir(parents=True,exist_ok=True)
             report_path.write_text(json.dumps(report,indent=2))
             print('VALIDATED PRINT ITEM',name,flush=True)
